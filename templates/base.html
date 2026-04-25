@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}NonprofitSage.ai{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/np-mark.svg?v=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="/static/fonts/open-sans-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link rel="stylesheet" href="/static/brand.css?v=91">
+    <meta property="og:title" content="NonprofitSage.ai">
+    <meta property="og:description" content="Predictive intelligence for the UK nonprofit sector">
+    <meta property="og:url" content="https://nonprofitsage.ai">
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    {% set _user = request.session.get('user', none) if request.session else none %}
+    {# Header + nav only for signed-in users. Public pages (home/login)
+       render full-bleed without the product chrome. #}
+    {% if _user %}
+    <header>
+        <a href="/" class="logo-link" aria-label="NonprofitSage.ai — home">
+            {# Wordmark only — the four-dot SVG was dropped in #373's
+               nav refresh because it competed with the typographic
+               wordmark in a 120px strip. "Sage" stays pink as the
+               single brand accent. #}
+            <span class="logo-text"><span class="logo-nonprofit">Nonprofit</span><span class="logo-sage">Sage</span><span class="logo-ai">.ai</span></span>
+        </a>
+        <input type="checkbox" id="nav-toggle" class="nav-toggle-input" hidden>
+        <label for="nav-toggle" class="nav-toggle-btn" aria-label="Toggle navigation">
+            <span></span><span></span><span></span>
+        </label>
+        {# Count hoists — compute each once so both the per-link badges and
+           the Admin rollup summary can reference them without re-calling
+           the Jinja-global functions. #}
+        {% set _agc = agencies_unguessed_count() %}
+        {% set _epc = pending_events_count() %}
+        {% set _arc = admin_review_count() %}
+        {% set _opc = outreach_pending_count() %}
+        {% set _admin_badge = _agc + _arc + _opc %}
+        {% set _path = request.url.path %}
+        {% set _ref_active = _path.startswith('/events') or _path.startswith('/news') or _path.startswith('/partnerships') or _path.startswith('/agencies') or _path.startswith('/outreach') or _path.startswith('/reports') %}
+        {% set _ref_badge = _agc + _opc + _epc %}
+        {# Nav grouped Find / Work / Reference per the UX review.
+           Find + Work stay flat (frequent daily items, one click); the
+           less-frequent Reference items roll up under "More". Review is
+           promoted out of the old Admin disclosure since it's curation
+           work, not settings. #}
+        <nav class="site-nav">
+            {# Find — opportunity surfaces #}
+            <a href="/pipeline" class="nav-link {% if _path == '/pipeline' %}nav-active{% endif %}">Intel</a>
+            <a href="/jobs" class="nav-link {% if _path == '/jobs' %}nav-active{% endif %}">Jobs</a>
+            <a href="/schools" class="nav-link {% if _path.startswith('/schools') %}nav-active{% endif %}">Schools</a>
+            <a href="/contracts" class="nav-link {% if _path == '/contracts' %}nav-active{% endif %}">Contracts</a>
+            <span class="nav-group-sep" aria-hidden="true"></span>
+            {# Work — active workflow #}
+            <a href="/shortlist" class="nav-link {% if _path == '/shortlist' %}nav-active{% endif %}">Shortlist</a>
+            <a href="/candidates" class="nav-link {% if _path == '/candidates' %}nav-active{% endif %}">Candidates</a>
+            <a href="/admin/review" class="nav-link {% if _path.startswith('/admin/review') %}nav-active{% endif %}">Review{% if _arc > 0 %} <span class="nav-badge">{{ _arc }}</span>{% endif %}</a>
+            <span class="nav-group-sep" aria-hidden="true"></span>
+            {# Reference — rolled up disclosure #}
+            <details class="nav-admin{% if _ref_active %} nav-active{% endif %}"{% if _ref_active %} open{% endif %}>
+                <summary class="nav-link nav-admin-summary">More{% if _ref_badge > 0 %} <span class="nav-badge">{{ _ref_badge }}</span>{% endif %}</summary>
+                <div class="nav-admin-menu">
+                    <a href="/events" class="nav-admin-item {% if _path == '/events' %}nav-active{% endif %}">Events{% if _epc > 0 %} <span class="nav-badge">{{ _epc }}</span>{% endif %}</a>
+                    <a href="/news" class="nav-admin-item {% if _path.startswith('/news') %}nav-active{% endif %}">News</a>
+                    <a href="/partnerships" class="nav-admin-item {% if _path == '/partnerships' %}nav-active{% endif %}">Partnerships</a>
+                    <a href="/agencies" class="nav-admin-item {% if _path.startswith('/agencies') %}nav-active{% endif %}">Agencies{% if _agc > 0 %} <span class="nav-badge">{{ _agc }}</span>{% endif %}</a>
+                    <a href="/outreach" class="nav-admin-item {% if _path.startswith('/outreach') %}nav-active{% endif %}">Outreach{% if _opc > 0 %} <span class="nav-badge">{{ _opc }}</span>{% endif %}</a>
+                    <a href="/reports" class="nav-admin-item {% if _path.startswith('/reports') %}nav-active{% endif %}">Reports</a>
+                </div>
+            </details>
+        </nav>
+        <div class="nav-user">
+            <button class="nav-user-btn" onclick="this.parentElement.classList.toggle('open')">
+                {% if _user.picture %}
+                <img src="{{ _user.picture }}" alt="" class="nav-avatar">
+                {% else %}
+                <span class="nav-avatar nav-avatar-fb">{{ (_user.given_name or 'U')[:1] }}</span>
+                {% endif %}
+                <span class="nav-user-name">{{ _user.given_name or 'User' }}</span>
+            </button>
+            <div class="nav-user-dropdown">
+                <div class="nav-user-email">{{ _user.email }}</div>
+                <a href="/logout" class="nav-user-signout">Sign out</a>
+            </div>
+        </div>
+    </header>
+    {% endif %}
+    <main id="main-content" class="{% block main_class %}container{% endblock %}">
+        {% block content %}{% endblock %}
+    </main>
+    {% if _user %}
+    <footer>
+        <div>
+            <span class="footer-brand">NonprofitSage.ai</span> — Predictive intelligence for the UK nonprofit sector
+        </div>
+    </footer>
+    {% endif %}
+    <div class="toast-container" id="toast-container"></div>
+    <script>
+    /* Toast notification helper */
+    function showToast(message, type) {
+        type = type || 'success';
+        var container = document.getElementById('toast-container');
+        var toast = document.createElement('div');
+        toast.className = 'toast toast-' + type;
+        toast.innerHTML = message;
+        container.appendChild(toast);
+        setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(function() { toast.remove(); }, 300); }, 3000);
+    }
+    /* Close user dropdown on click outside */
+    document.addEventListener('click', function(e) {
+        var dd = document.querySelector('.nav-user.open');
+        if (dd && !dd.contains(e.target)) { dd.classList.remove('open'); }
+    });
+
+    /* Double-handle linear range slider. Any .ds-range on the page
+       auto-initialises on DOMContentLoaded. Handles sit on a shared
+       0..100 scale that maps linearly to £0..£20m (a flat £200k per
+       percent), which keeps step size consistent across the range
+       instead of the old log scale where each 1% was a tiny jump at
+       the low end and a multi-million jump at the top. £20m covers
+       >99% of UK charities; anything above that is captured by the
+       "any" sentinel at the MAX handle's rightmost position.
+       Hidden number inputs (referenced via data-min-target /
+       data-max-target on the container) carry the £ values that
+       submit with the form. */
+    var DS_RANGE_MAX = 20000000;   // £20m — upper bound of the linear scale.
+    function initDsRange(container) {
+      var minR = container.querySelector('[data-role="min-range"]');
+      var maxR = container.querySelector('[data-role="max-range"]');
+      var minOut = container.querySelector('[data-role="min-out"]');
+      var maxOut = container.querySelector('[data-role="max-out"]');
+      var fill = container.querySelector('.ds-range-fill');
+      var minH = document.getElementById(container.dataset.minTarget || '');
+      var maxH = document.getElementById(container.dataset.maxTarget || '');
+      if (!minR || !maxR) return;
+      /* Each handle has an "unbounded" sentinel at the outer edge of its
+         range: MAX at p=100 → no upper cap; MIN at p=0 → no lower cap.
+         Both serialize as "" in the hidden input, which the backend
+         (api/routers/jobs.py::_parse_income_bound) treats as no-filter.
+         The MIN handle at p=100 intentionally stays at the top of the
+         linear range (£20m) meaning "at least £20m"; the MAX handle at
+         p=0 intentionally stays at £0 meaning "at most £0". */
+      function pToPounds(p, isMax) {
+        if (isMax && p >= 100) return '';
+        if (!isMax && p <= 0) return '';
+        return Math.round((p / 100) * DS_RANGE_MAX);
+      }
+      function poundsToP(v, isMax) {
+        /* Inverse: empty on either handle snaps to its sentinel edge.
+           Values above the linear max clamp to 100 (so a pre-populated
+           £50m default still renders sensibly with the max handle
+           pinned to "any"). */
+        if (v === '' || v === null || v === undefined) return isMax ? 100 : 0;
+        var n = parseFloat(v);
+        if (!n || n <= 0) return isMax ? 100 : 0;
+        return Math.max(0, Math.min(100, (n / DS_RANGE_MAX) * 100));
+      }
+      function fmt(v) {
+        if (v === '' || v === null || v === undefined || !v) return 'any';
+        if (v >= 1e6) return '£' + (v / 1e6).toFixed(v % 1e6 ? 1 : 0) + 'm';
+        if (v >= 1000) return '£' + Math.round(v / 1000) + 'k';
+        return '£' + v;
+      }
+      function update() {
+        var lo = parseFloat(minR.value), hi = parseFloat(maxR.value);
+        var loP = pToPounds(lo, false);    // min handle: p=0 → "" ("no minimum")
+        var hiP = pToPounds(hi, true);     // max handle: p=100 → "" ("any")
+        if (minOut) minOut.textContent = fmt(loP);
+        if (maxOut) maxOut.textContent = fmt(hiP);
+        /* Write the raw sentinel through — empty string at a sentinel
+           end, numeric otherwise. Previously this coerced to 0, which
+           the jobs endpoint (since PR #360) correctly treats as "no
+           filter", but the pipeline endpoint used to treat 0 as a real
+           cap; keeping "" keeps both paths honest. */
+        if (minH) minH.value = loP;
+        if (maxH) maxH.value = hiP;
+        if (fill) {
+          fill.style.left = lo + '%';
+          fill.style.right = (100 - hi) + '%';
+        }
+        minR.style.zIndex = lo > 50 ? '3' : '2';
+        maxR.style.zIndex = lo > 50 ? '2' : '3';
+      }
+      if (minH) minR.value = poundsToP(minH.value, false);
+      if (maxH) maxR.value = poundsToP(maxH.value, true);
+      update();
+      minR.addEventListener('input', function () {
+        if (parseFloat(minR.value) > parseFloat(maxR.value)) maxR.value = minR.value;
+        update();
+      });
+      maxR.addEventListener('input', function () {
+        if (parseFloat(maxR.value) < parseFloat(minR.value)) minR.value = maxR.value;
+        update();
+      });
+      function commit() {
+        if (minH) minH.dispatchEvent(new Event('change', { bubbles: true }));
+        if (maxH) maxH.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      minR.addEventListener('change', commit);
+      maxR.addEventListener('change', commit);
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.ds-range').forEach(initDsRange);
+    });
+    </script>
+</body>
+</html>

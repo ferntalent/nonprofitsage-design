@@ -1,0 +1,21 @@
+{# HTMX fragment: list of school cards with optional load-more button #}
+{% if not items %}
+<div style="text-align:center;padding:2.5rem 1rem;color:var(--text-muted);">
+  <div style="font-size:0.9rem;font-weight:700;color:var(--text-secondary);">No schools match this filter</div>
+  <div style="font-size:0.78rem;margin-top:0.25rem;">Try different filters or clear your search</div>
+</div>
+{% endif %}
+{% for item in items %}
+    {% set card_rank = loop.index + (offset|default(0)|int) %}
+    {% include "components/school_card.html" %}
+{% endfor %}
+
+{% if items|length < total %}
+<button class="load-more"
+        hx-get="/schools/cards?offset={{ offset + limit }}&limit={{ limit }}&school_type={{ school_type | default('all') | urlencode }}&income_band={{ income_band | default('') | urlencode }}&postcode={{ postcode | default('') | urlencode }}"
+        hx-target="#school-card-list"
+        hx-swap="beforeend"
+        hx-on::after-request="this.remove()">
+    Load more
+</button>
+{% endif %}

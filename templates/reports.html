@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Reports — NonprofitSage.ai{% endblock %}
+{% block content %}
+
+<style>
+  .rp-wrap { max-width: 960px; margin: 0 auto; padding: 1.25rem 0.5rem; }
+  .rp-header { margin-bottom: 1.25rem; }
+  .rp-title { font-size: 1.3rem; font-weight: 800; color: var(--navy); margin: 0 0 0.3rem; }
+  .rp-desc { font-size: 0.88rem; color: var(--text-muted); margin: 0; max-width: 720px; }
+  .rp-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+  .rp-card h3 { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 800; color: var(--navy); display: flex; align-items: center; gap: 0.5rem; }
+  .rp-card p.rp-card-desc { margin: 0 0 0.85rem; font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; }
+  .rp-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .rp-badge-live { background: #e6f9f0; color: #15803d; }
+  .rp-badge-ai { background: var(--pink-soft); color: var(--pink); }
+  .rp-form-row { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; }
+  .rp-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
+  .rp-field label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .rp-field input, .rp-field select { font-size: 0.88rem; border: 1.5px solid var(--border); border-radius: 6px; padding: 0.5rem 0.7rem; font-family: 'Open Sans', sans-serif; background: var(--surface); }
+  .rp-field input:focus, .rp-field select:focus { outline: none; border-color: var(--navy); }
+  .rp-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; padding: 0.55rem 1rem; border-radius: 6px; border: 1.5px solid var(--navy); background: var(--navy); color: #fff; font-family: 'Open Sans', sans-serif; cursor: pointer; }
+  .rp-btn:hover { background: #1a3347; }
+  .rp-btn[disabled] { opacity: 0.6; cursor: wait; }
+  .rp-btn-pink { background: var(--pink); border-color: var(--pink); }
+  .rp-btn-pink:hover { background: #e5459c; }
+  .rp-hint { font-size: 0.76rem; color: var(--text-muted); margin-top: 0.5rem; }
+  .rp-search-box { position: relative; }
+  .rp-search-results { list-style: none; margin: 4px 0 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; max-height: 220px; overflow: auto; box-shadow: var(--shadow-sm); }
+  .rp-search-results li { padding: 0.4rem 0.7rem; font-size: 0.82rem; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  .rp-search-results li:last-child { border-bottom: none; }
+  .rp-search-results li:hover { background: var(--pink-soft); }
+  .rp-search-region { color: var(--text-muted); font-size: 0.75rem; }
+  .rp-search-none, .rp-search-err { padding: 0.5rem 0.7rem; font-size: 0.82rem; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-top: 4px; }
+  .rp-selected-org { font-size: 0.82rem; color: var(--text-primary); background: var(--pink-soft); border: 1px solid var(--pink); border-radius: 6px; padding: 0.4rem 0.7rem; margin-top: 6px; display: none; }
+  .rp-selected-org.show { display: block; }
+  .rp-status { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; min-height: 1em; }
+  .rp-status.working { color: var(--pink); font-weight: 600; }
+  .rp-dq { margin-top: 1.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .rp-dq summary { cursor: pointer; padding: 0.85rem 1.2rem; font-weight: 700; color: var(--navy); font-size: 0.95rem; }
+  .rp-dq[open] summary { border-bottom: 1px solid var(--border); }
+  .rp-dq-body { padding: 1rem 1.2rem; }
+</style>
+
+<div class="rp-wrap">
+  <header class="rp-header">
+    <h1 class="rp-title">Reports</h1>
+    <p class="rp-desc">
+      Generate client-ready briefings on any UK nonprofit, cause-area snapshots for
+      sector planning, or a status report of your own pipeline activity. Powered by
+      Claude Haiku. Generation takes 10-30 seconds — your browser will start the
+      download when the PDF is ready.
+    </p>
+  </header>
+
+  <!-- Card 1: Org briefing -->
+  <section class="rp-card">
+    <h3>Organisation briefing pack <span class="rp-badge rp-badge-ai">AI</span></h3>
+    <p class="rp-card-desc">
+      A comprehensive briefing on a single organisation — overview, key people,
+      financials, peer context, and opportunities for Fern Talent. Great for a
+      cold-approach preparation pack or a client-facing prospectus.
+    </p>
+    <form id="rp-org-form" method="post" action="/reports/org-briefing" target="_blank">
+      <div class="rp-search-box">
+        <div class="rp-field">
+          <label for="rp-org-q">Search organisations</label>
+          <input
+            id="rp-org-q"
+            type="text"
+            placeholder="Type at least 2 letters — e.g. Macmillan"
+            value="{{ prefilled_org_name }}"
+            autocomplete="off"
+            hx-get="/reports/org-search"
+            hx-trigger="keyup changed delay:300ms"
+            hx-target="#rp-org-results"
+            hx-include="this"
+            name="q"
+          >
+        </div>
+        <div id="rp-org-results"></div>
+        <div class="rp-selected-org {% if prefilled_org_id %}show{% endif %}" id="rp-org-selected">
+          Selected: <strong id="rp-org-selected-name">{{ prefilled_org_name }}</strong>
+        </div>
+      </div>
+      <input type="hidden" name="org_id" id="rp-org-id" value="{{ prefilled_org_id }}">
+      <div style="margin-top: 0.85rem;">
+        <button type="submit" class="rp-btn rp-btn-pink" id="rp-org-submit" {% if not prefilled_org_id %}disabled{% endif %}>Generate briefing</button>
+      </div>
+      <div class="rp-status" id="rp-org-status"></div>
+    </form>
+  </section>
+
+  <!-- Card 2: Sector snapshot -->
+  <section class="rp-card">
+    <h3>Sector snapshot <span class="rp-badge rp-badge-ai">AI</span></h3>
+    <p class="rp-card-desc">
+      An overview of a cause area — top ten organisations by score, common signals,
+      recent people moves, and opportunities. Useful for sector planning or a
+      pitch targeting a cause-specific market.
+    </p>
+    <form id="rp-sector-form" method="post" action="/reports/sector-snapshot" target="_blank">
+      <div class="rp-form-row">
+        <div class="rp-field">
+          <label for="rp-cause">Cause area</label>
+          <select id="rp-cause" name="cause" required>
+            <option value="">Select cause area…</option>
+            {% for c in causes %}
+              <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="rp-field">
+          <label for="rp-region">Region (optional)</label>
+          <select id="rp-region" name="region">
+            <option value="">All regions</option>
+            {% for r in regions %}
+              <option value="{{ r }}">{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <button type="submit" class="rp-btn rp-btn-pink">Generate snapshot</button>
+        </div>
+      </div>
+      <div class="rp-status" id="rp-sector-status"></div>
+    </form>
+  </section>
+
+  <!-- Card 3: Pipeline status -->
+  <section class="rp-card">
+    <h3>Pipeline status <span class="rp-badge rp-badge-live">Data</span></h3>
+    <p class="rp-card-desc">
+      Review your own pipeline activity — leads claimed, outreach drafted, contacts
+      enriched, jobs tracked, upcoming events. Fresh every time.
+    </p>
+    <form id="rp-pipeline-form" method="post" action="/reports/pipeline-status" target="_blank">
+      <div class="rp-form-row">
+        <div class="rp-field">
+          <label for="rp-days">Time window</label>
+          <select id="rp-days" name="days">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+        </div>
+        <div>
+          <button type="submit" class="rp-btn">Generate report</button>
+        </div>
+      </div>
+      <div class="rp-status" id="rp-pipeline-status"></div>
+    </form>
+  </section>
+
+  <!-- Data quality (lazy-loaded via Task 5 endpoint) -->
+  <details class="rp-dq">
+    <summary>Data quality dashboard</summary>
+    <div class="rp-dq-body"
+         hx-get="/admin/data-quality?fragment=1"
+         hx-trigger="toggle once from:closest details[open]"
+         hx-swap="innerHTML">
+      <em style="color: var(--text-muted); font-size: 0.85rem;">Loading metrics…</em>
+    </div>
+  </details>
+
+  <!-- Footer utility link -->
+  <section class="rp-card" style="margin-top: 1.5rem;">
+    <h3>Download a single-org dossier <span class="rp-badge rp-badge-live">Live</span></h3>
+    <p class="rp-card-desc">
+      The original single-org PDF dossier is still available from any
+      organisation's page — open an org from Intel and click "Download PDF" in the
+      header.
+    </p>
+  </section>
+</div>
+
+<script>
+  // Card 1: org-search click-to-select
+  (function() {
+    var input = document.getElementById('rp-org-q');
+    var hidden = document.getElementById('rp-org-id');
+    var selected = document.getElementById('rp-org-selected');
+    var selectedName = document.getElementById('rp-org-selected-name');
+    var submit = document.getElementById('rp-org-submit');
+    var results = document.getElementById('rp-org-results');
+
+    results.addEventListener('click', function(ev) {
+      var li = ev.target.closest('li[data-org-id]');
+      if (!li) return;
+      hidden.value = li.getAttribute('data-org-id');
+      var name = li.getAttribute('data-org-name') || '';
+      input.value = name;
+      selectedName.textContent = name;
+      selected.classList.add('show');
+      submit.removeAttribute('disabled');
+      results.innerHTML = '';
+    });
+
+    input.addEventListener('input', function() {
+      if (hidden.value && input.value !== selectedName.textContent) {
+        hidden.value = '';
+        submit.setAttribute('disabled', 'disabled');
+        selected.classList.remove('show');
+      }
+    });
+  })();
+
+  // Generic submit handler: show working state, re-enable after a safety window
+  ['rp-org-form', 'rp-sector-form', 'rp-pipeline-form'].forEach(function(formId) {
+    var form = document.getElementById(formId);
+    if (!form) return;
+    form.addEventListener('submit', function() {
+      var btn = form.querySelector('button[type="submit"]');
+      var status = form.querySelector('.rp-status');
+      if (btn) {
+        btn.setAttribute('disabled', 'disabled');
+        btn.dataset.origText = btn.textContent;
+        btn.textContent = 'Generating…';
+      }
+      if (status) {
+        status.classList.add('working');
+        status.textContent = 'Generating PDF — this can take up to 30 seconds.';
+      }
+      setTimeout(function() {
+        if (btn) {
+          btn.removeAttribute('disabled');
+          if (btn.dataset.origText) btn.textContent = btn.dataset.origText;
+        }
+        if (status) {
+          status.classList.remove('working');
+          status.textContent = '';
+        }
+      }, 40000);
+    });
+  });
+</script>
+
+{% endblock %}

@@ -1,0 +1,179 @@
+<article class="dossier-panel">
+    <header>
+        <h3 class="ds-label" style="margin:0;">Annual Report Intelligence</h3>
+        {% if report and report|length > 0 %}
+            {% set r = report[0] %}
+            {% set ds = r.get('data_source', '') or '' %}
+            {% if 'claude' in ds.lower() %}
+                <span class="badge badge-fw" title="High quality Claude extraction">Claude</span>
+            {% elif 'gemini' in ds.lower() %}
+                <span class="badge badge-bn" title="Gemini extraction">Gemini</span>
+            {% elif 'both' in ds.lower() %}
+                <span class="badge badge-fw" title="Claude + Gemini extraction">Claude + Gemini</span>
+            {% elif 'keywords' in ds.lower() %}
+                <span class="badge badge-keywords" title="Keyword signals only">Keywords only</span>
+            {% endif %}
+        {% endif %}
+    </header>
+
+    {% if not report or report|length == 0 %}
+        <p class="muted">No annual report data available for this organisation.</p>
+    {% else %}
+        {% set r = report[0] %}
+
+        <!-- Analyst Summary (most valuable field) -->
+        {% set summary = r.get('analyst_summary', '') or '' %}
+        {% if summary %}
+        <div class="analyst-summary-box">
+            <strong>Analyst Summary</strong>
+            <p style="margin:0.5rem 0 0">{{ summary }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Score indicators -->
+        {% set bn = r.get('bleeding_neck_score') %}
+        {% set fw = r.get('fresh_wallet_score') %}
+        {% if bn is not none or fw is not none %}
+        <div class="score-indicators">
+            {% if bn is not none %}
+            <div>
+                <strong>Distress Score</strong>
+                <small style="display:block;color:var(--text-muted);margin-bottom:.25rem;">From annual report analysis. Scale: 0 (no distress) to 5 (severe distress).</small>
+                <div class="score-value {% if bn >= 4 %}score-danger{% elif bn >= 2 %}score-amber{% else %}score-ok{% endif %}"
+                     title="Distress score {{ bn }}/5 — {% if bn >= 4 %}severe distress signals{% elif bn >= 2 %}moderate distress signals{% else %}low or no distress{% endif %}">
+                    {{ bn }}<span class="score-max">/5</span>
+                </div>
+            </div>
+            {% endif %}
+            {% if fw is not none %}
+            <div>
+                <strong>Growth Score</strong>
+                <small style="display:block;color:var(--text-muted);margin-bottom:.25rem;">From annual report analysis. Scale: 0 (no growth signals) to 5 (strong growth signals).</small>
+                <div class="score-value {% if fw >= 4 %}score-ok{% elif fw >= 2 %}score-amber{% else %}score-muted{% endif %}"
+                     title="Growth score {{ fw }}/5 — {% if fw >= 4 %}strong growth signals{% elif fw >= 2 %}moderate growth signals{% else %}limited growth signals{% endif %}">
+                    {{ fw }}<span class="score-max">/5</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Detail fields -->
+        <table role="grid">
+            <tbody>
+                {% set leadership = r.get('leadership_changes', '') or '' %}
+                {% if leadership %}
+                <tr>
+                    <td><strong>Leadership Changes</strong></td>
+                    <td>{{ leadership }}</td>
+                </tr>
+                {% endif %}
+
+                {% set hiring = r.get('hiring_intent', '') or '' %}
+                {% if hiring %}
+                <tr>
+                    <td><strong>Hiring Intent</strong></td>
+                    <td>{{ hiring }}</td>
+                </tr>
+                {% endif %}
+
+                {% set fundraising = r.get('fundraising_strategy', '') or '' %}
+                {% if fundraising %}
+                <tr>
+                    <td><strong>Fundraising Strategy</strong></td>
+                    <td>{{ fundraising }}</td>
+                </tr>
+                {% endif %}
+
+                {% set income_mix = r.get('income_mix_signal', '') or '' %}
+                {% if income_mix %}
+                <tr>
+                    <td><strong>Income Mix Signal</strong></td>
+                    <td>{{ income_mix }}</td>
+                </tr>
+                {% endif %}
+
+                {% set fmodel = r.get('primary_funding_model', '') or '' %}
+                {% if fmodel and fmodel != 'Unknown' %}
+                {% set fsummary = r.get('funding_summary', '') or '' %}
+                {% set scount = r.get('stream_count') %}
+                <tr>
+                    <td><strong>Funding Profile</strong></td>
+                    <td>
+                        <span class="badge
+                            {% if fmodel == 'Diversified' %}badge-perm
+                            {% elif fmodel == 'Grant-dependent' %}badge-warm
+                            {% elif fmodel == 'Donor-led' %}badge-interim
+                            {% elif fmodel == 'Trading/earned' %}badge-monitor
+                            {% elif fmodel == 'Statutory-dependent' %}badge-fixed
+                            {% elif fmodel == 'Events-driven' %}badge-hot
+                            {% endif %}">{{ fmodel }}</span>
+                        {% if scount is not none %}
+                        <small style="color:var(--text-muted);margin-left:0.5rem;">{{ scount }} stream{{ 's' if scount != 1 }} detected</small>
+                        {% endif %}
+                        {% if fsummary %}
+                        <div class="link-row" style="margin-top:0.4rem;">
+                            {% for stream in fsummary.split(',') %}
+                                {% set stream_clean = stream.strip() %}
+                                {% if stream_clean %}
+                                <span class="badge badge-monitor">
+                                    {{ stream_clean|replace('_',' ')|title }}
+                                </span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+
+                {% set priorities = r.get('strategic_priorities', '') or '' %}
+                {% if priorities %}
+                <tr>
+                    <td><strong>Strategic Priorities</strong></td>
+                    <td>{{ priorities }}</td>
+                </tr>
+                {% endif %}
+
+                {% set risks = r.get('key_risks', '') or '' %}
+                {% if risks %}
+                <tr>
+                    <td><strong>Key Risks</strong></td>
+                    <td>{{ risks }}</td>
+                </tr>
+                {% endif %}
+
+                {% set reserves = r.get('reserves_position', '') or '' %}
+                {% if reserves %}
+                <tr>
+                    <td><strong>Reserves Position</strong></td>
+                    <td>{{ reserves }}</td>
+                </tr>
+                {% endif %}
+
+                {% set distress = r.get('financial_distress', '') or '' %}
+                {% if distress %}
+                <tr>
+                    <td><strong>Financial Distress</strong></td>
+                    <td>{{ distress }}</td>
+                </tr>
+                {% endif %}
+
+                <!-- Keyword signals (for keywords-only orgs) -->
+                {% set kw_bn = r.get('keyword_bn_score') %}
+                {% set kw_fw = r.get('keyword_fw_score') %}
+                {% set kw_signals = r.get('keyword_signals', '') or '' %}
+                {% if kw_bn is not none or kw_fw is not none or kw_signals %}
+                <tr>
+                    <td><strong>Keyword Signals</strong></td>
+                    <td>
+                        {% if kw_bn is not none %}Distress: {{ kw_bn }}{% endif %}
+                        {% if kw_fw is not none %} Growth: {{ kw_fw }}{% endif %}
+                        {% if kw_signals %}<br><small>{{ kw_signals }}</small>{% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    {% endif %}
+</article>

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Shortlist — NonprofitSage.ai{% endblock %}
+
+{% block content %}
+
+<style>
+/* ── Shortlist-scoped styles ── */
+.sl-card {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--pink);
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 6px;
+  box-shadow: var(--shadow-sm); transition: box-shadow 0.12s;
+  display: flex; align-items: center; gap: 12px;
+}
+.sl-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+.sl-favicon { width: 24px; height: 24px; border-radius: 5px; flex-shrink: 0; object-fit: contain; }
+.sl-favicon-fb {
+  width: 24px; height: 24px; border-radius: 5px; flex-shrink: 0;
+  background: var(--navy); color: #fff; font-size: 10px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sl-main { flex: 1; min-width: 0; }
+
+.sl-org-name { font-size: 14px; font-weight: 700; color: var(--navy); text-decoration: none; }
+.sl-org-name:hover { color: var(--pink); }
+.sl-title-row { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 1px; }
+.sl-title-row a { color: inherit; text-decoration: none; }
+.sl-title-row a:hover { text-decoration: underline; }
+.sl-salary { font-size: 12px; color: var(--text-secondary); margin-left: 4px; }
+
+.sl-meta {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
+  font-size: 0.68rem; color: var(--text-muted); align-items: center;
+}
+
+.sl-remove {
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+  padding: 3px 8px; border-radius: 4px; font-size: 0.72rem;
+  cursor: pointer; transition: all 0.12s; flex-shrink: 0;
+  font-family: 'Open Sans', sans-serif;
+}
+.sl-remove:hover { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+
+.sl-empty { text-align: center; padding: 3rem; color: var(--text-muted); }
+.sl-empty p { color: var(--text-muted); }
+.sl-meta .badge a { color: inherit; }
+
+/* Archive treatment for closed listings (job aged out of the live
+   parquet but the user's shortlist entry survives). Per the UX
+   review's "archive-state treatment" P2: greyed row, dimmed contrast
+   so live picks read first. The "Removed from job board" badge in the
+   meta row already labels the state — this just turns down the
+   visual volume. */
+.sl-card-archived {
+  background: var(--bg, #f3f5f8);
+  border-left-color: var(--text-muted, #8c95a6);
+  opacity: 0.78;
+}
+.sl-card-archived:hover { opacity: 1; }
+.sl-card-archived .sl-org-name { color: var(--text-secondary, #5a6578); }
+.sl-card-archived .sl-title-row { color: var(--text-muted, #8c95a6); }
+</style>
+
+<h2>Shortlist</h2>
+<p class="page-desc">Jobs saved for active pursuit — organised by who's working on them.</p>
+
+<div class="stat-card-grid">
+    <div class="stat-card">
+        <div class="stat-card-number">{{ total }}</div>
+        <div class="stat-card-label">Total shortlisted</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-number highlight">{{ tim_count }}</div>
+        <div class="stat-card-label">Tim's picks</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-number steel">{{ rory_count }}</div>
+        <div class="stat-card-label">Rory's picks</div>
+    </div>
+</div>
+
+<div class="filter-row">
+    <a href="/shortlist?owner=all" class="filter-pill {{ 'active' if current_owner == 'all' }}">All ({{ total }})</a>
+    <a href="/shortlist?owner=Tim" class="filter-pill {{ 'active' if current_owner == 'Tim' }}">Tim ({{ tim_count }})</a>
+    <a href="/shortlist?owner=Rory" class="filter-pill {{ 'active' if current_owner == 'Rory' }}">Rory ({{ rory_count }})</a>
+</div>
+
+{% if jobs %}
+    {% for j in jobs %}
+    <div class="sl-card{% if j.is_stale %} sl-card-archived{% endif %}" id="sl-{{ j.job_id }}">
+        {% if j.source_url and j.source_url != 'None' %}
+            <img class="sl-favicon"
+                 src="https://www.google.com/s2/favicons?domain={{ j.source_url.replace('https://','').replace('http://','').split('/')[0] }}&sz=32"
+                 alt="" loading="lazy"
+                 onerror="this.style.display='none'">
+        {% else %}
+            <div class="sl-favicon-fb">{{ j.org_name[:1] }}</div>
+        {% endif %}
+
+        <div class="sl-main">
+            <div>
+                {% if j.org_id and j.org_id != 'None' %}
+                    <a href="/org/{{ j.org_id }}" class="sl-org-name">{{ j.org_name|smart_org }}</a>
+                {% else %}
+                    <span class="sl-org-name">{{ j.org_name|smart_org }}</span>
+                {% endif %}
+            </div>
+            <div class="sl-title-row">
+                {% if j.source_url and j.source_url != 'None' %}
+                    <a href="{{ j.source_url }}" target="_blank">{{ j.job_title }}</a>
+                {% else %}
+                    {{ j.job_title }}
+                {% endif %}
+                {% if j.salary_display %}<span class="sl-salary">{{ j.salary_display }}</span>{% endif %}
+            </div>
+            <div class="sl-meta">
+                <span class="badge {{ 'badge-hot' if j.owner == 'Tim' else 'badge-monitor' }}">{{ j.owner }}</span>
+                {% if j.claimed_by %}
+                    <span class="badge badge-perm">Claimed: {{ j.claimed_by }}</span>
+                {% endif %}
+                {% if j.guessed_charity %}
+                    <span class="badge badge-warm">
+                        {{ j.guessed_charity }}
+                        {% if j.guessed_url %}<a href="{{ j.guessed_url }}" target="_blank">&#128279;</a>{% endif %}
+                    </span>
+                {% endif %}
+                {% if j.contract_type and j.contract_type != 'unknown' %}
+                    <span>{{ j.contract_type.replace('_',' ').title() }}</span>
+                {% endif %}
+                <span>Shortlisted {{ j.shortlisted_at }}</span>
+                {% if j.closing_date and j.closing_date != 'None' %}
+                    <span>Closes {{ j.closing_date }}</span>
+                {% endif %}
+                {% if j.is_stale %}
+                    <span class="badge badge-monitor" title="This job has aged out of the live board — the listing is no longer tracked, but your shortlist entry is preserved.">Removed from job board</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <button class="sl-remove"
+                hx-post="/shortlist/remove/{{ j.job_id }}"
+                hx-target="#sl-{{ j.job_id }}"
+                hx-swap="outerHTML"
+                title="Remove from shortlist">Remove</button>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="sl-empty">
+        <p>No shortlisted jobs yet. Use the Shortlist button on job cards to add them.</p>
+    </div>
+{% endif %}
+
+{% endblock %}

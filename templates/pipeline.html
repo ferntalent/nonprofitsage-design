@@ -1,0 +1,643 @@
+{% extends "base.html" %}
+{% block title %}Intel — NonprofitSage.ai{% endblock %}
+{% block main_class %}container-full{% endblock %}
+{% block content %}
+
+<div class="master-detail">
+
+  {# -- LEFT PANEL: stats + NL search + filters + card list -- #}
+  <div class="master-list">
+    <div class="master-list-inner">
+
+      {# Stats row — two cards, comma-formatted, fit at mobile + desktop widths. #}
+      <div class="stat-card-grid" id="pipeline-stats">
+        <div class="stat-card">
+          <div class="stat-card-number">{{ "{:,}".format(stats.get('total', 0) or 0) }}</div>
+          <div class="stat-card-label">Total leads</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-number highlight">{{ "{:,}".format(stats.get('new_24h', 0) or 0) }}</div>
+          <div class="stat-card-label">New in last 24h</div>
+        </div>
+      </div>
+
+      <p class="page-desc">Organisations showing early signs they may need recruitment or consultancy support soon, based on financial, governance, and hiring signals.</p>
+
+      {# Quick org-name search. The Haiku-powered NL parser was removed
+         in #372 — it kept hallucinating filters the backend couldn't
+         honour, and the filter form already covers status / frame /
+         region / income / signal. /pipeline/search-nl now runs a plain
+         fuzzy match against org_name. #}
+      <form class="nl-search-form" data-nl-history-key="nl_history_pipeline"
+            hx-post="/pipeline/search-nl"
+            hx-target="#pipeline-card-list"
+            hx-swap="innerHTML">
+        <textarea name="nl_query" rows="1" class="nl-search-input"
+                  placeholder="Search organisation name — e.g. Age UK, NHS, housing association"></textarea>
+        <div class="nl-history" hidden></div>
+        <div class="nl-loading" hidden>
+          <span class="nl-spinner"></span>
+          <span>Searching&hellip;</span>
+        </div>
+        <div class="nl-error" hidden role="alert"></div>
+        <div class="nl-search-actions">
+          <button type="submit" class="btn-primary" style="white-space:nowrap;">Search</button>
+        </div>
+      </form>
+
+      {# Filter pills #}
+      <form id="filters" class="pipeline-filters"
+            hx-get="/pipeline/cards"
+            hx-target="#pipeline-card-list"
+            hx-swap="innerHTML"
+            hx-trigger="submit"
+            hx-include="#filters">
+        {# Hidden inputs carry actual values #}
+        <input type="hidden" name="status" id="val-status" value="new,triaged,pursuing,monitoring">
+        <input type="hidden" name="primary_frame" id="val-frame" value="">
+        <input type="hidden" name="score_band" id="val-band" value="">
+        <input type="hidden" name="sort" id="val-sort" value="biggest_movers">
+        <input type="hidden" name="region" id="val-region" value="">
+        <input type="hidden" name="income_band_key" id="val-income" value="">
+        <input type="hidden" name="signal_tag" id="val-signal-tag" value="">
+        <input type="hidden" name="funding_stream" id="val-stream" value="{{ funding_stream or '' }}">
+
+        <div class="filter-row">
+          <span class="filter-label">Status</span>
+          <button type="button" class="filter-pill active" data-group="status" data-value="new,triaged,pursuing,monitoring">All</button>
+          <button type="button" class="filter-pill" data-group="status" data-value="new" title="Untouched leads">New</button>
+          <button type="button" class="filter-pill" data-group="status" data-value="triaged" title="Someone has looked at it">Working</button>
+          <button type="button" class="filter-pill" data-group="status" data-value="pursuing" title="Actively being worked by Tim or Rory">Claimed</button>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">Signal</span>
+          <button type="button" class="filter-pill active" data-group="frame" data-value="">All</button>
+          <button type="button" class="filter-pill frame-distress" data-group="frame" data-value="bleeding_neck" title="Organisations showing signs of financial or operational difficulty">Distress signals</button>
+          <button type="button" class="filter-pill frame-growth" data-group="frame" data-value="fresh_wallet" title="Organisations showing signs of expansion or new spending">Growth signals</button>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">Sort</span>
+          <button type="button" class="filter-pill active" data-group="sort" data-value="biggest_movers" title="Sort by biggest score change since last run — highlights fast-moving opportunities">Movers</button>
+          <button type="button" class="filter-pill" data-group="sort" data-value="" title="Sort by absolute intel score">Score</button>
+          <button type="button" class="filter-pill" data-group="sort" data-value="recency" title="Most recently updated opportunities first">Newest</button>
+        </div>
+        <details class="advanced-filters">
+          <summary>Advanced filters</summary>
+          <div class="filter-row">
+            <span class="filter-label">Region</span>
+            <button type="button" class="filter-pill active" data-group="region" data-value="">All</button>
+            <button type="button" class="filter-pill" data-group="region" data-value="London">London</button>
+            <button type="button" class="filter-pill" data-group="region" data-value="South East">South East</button>
+            <button type="button" class="filter-pill" data-group="region" data-value="Midlands">Midlands</button>
+            <button type="button" class="filter-pill" data-group="region" data-value="North">North</button>
+            <button type="button" class="filter-pill" data-group="region" data-value="Scotland">Scotland</button>
+            <button type="button" class="filter-pill" data-group="region" data-value="Wales">Wales</button>
+            <button type="button" class="filter-pill" data-group="region" data-value="NI">NI</button>
+          </div>
+          <div class="filter-row filter-row-range">
+            <span class="filter-label">Income</span>
+            {# Hidden numeric bounds drive the income_min / income_max params
+               on /pipeline/cards. The deprecated income_band_key hidden
+               stays on the form but empty so the backend falls through to
+               the numeric range. #}
+            <input type="hidden" name="income_min" id="p-income-min" value="">
+            <input type="hidden" name="income_max" id="p-income-max" value="">
+            <div class="ds-range"
+                 data-min-target="p-income-min"
+                 data-max-target="p-income-max">
+              <div class="ds-range-readout">
+                <span><strong data-role="min-out">any</strong> min</span>
+                <span>max <strong data-role="max-out">any</strong></span>
+              </div>
+              <div class="ds-range-track">
+                <div class="ds-range-fill"></div>
+                <input type="range" data-role="min-range" min="0" max="100" value="0" step="1" aria-label="Minimum income">
+                <input type="range" data-role="max-range" min="0" max="100" value="100" step="1" aria-label="Maximum income">
+              </div>
+              <div class="ds-range-ticks">
+                <span>£0</span><span>£5m</span><span>£10m</span><span>£15m</span><span>£20m</span>
+              </div>
+            </div>
+          </div>
+          <div class="filter-row">
+            <span class="filter-label">Search</span>
+            <input type="text" name="org_search" placeholder="Search organisations..." class="filter-input" style="min-width:120px;">
+            <button type="submit" id="search-btn" class="btn-primary">Search</button>
+          </div>
+          <div class="filter-row">
+            <span class="filter-label">Cause</span>
+            <select name="cause_area" class="filter-select">
+              <option value="">All causes</option>
+              <option value="Education">Education</option>
+              <option value="Health">Health</option>
+              <option value="Disability">Disability</option>
+              <option value="Children &amp; Youth">Children &amp; Youth</option>
+              <option value="Arts &amp; Culture">Arts &amp; Culture</option>
+              <option value="Animals">Animals</option>
+              <option value="Environment">Environment</option>
+              <option value="International">International</option>
+              <option value="Housing">Housing</option>
+              <option value="Social Services">Social Services</option>
+              <option value="Mental Health">Mental Health</option>
+              <option value="Sport">Sport</option>
+              <option value="Religious">Religious</option>
+              <option value="Community Development">Community Dev</option>
+              <option value="Older People">Older People</option>
+              <option value="Schools">Schools</option>
+              <option value="Higher Education">Higher Education</option>
+            </select>
+          </div>
+          <div class="filter-row">
+            <span class="filter-label" title="Filter by how the organisation primarily raises money">Funding stream</span>
+            <button type="button" class="filter-pill {% if not funding_stream %}active{% endif %}" data-group="stream" data-value="">All</button>
+            <button type="button" class="filter-pill {% if funding_stream == 'major_gifts' %}active{% endif %}" data-group="stream" data-value="major_gifts" title="Large donations from individual philanthropists">Major gifts</button>
+            <button type="button" class="filter-pill {% if funding_stream == 'trusts_foundations' %}active{% endif %}" data-group="stream" data-value="trusts_foundations" title="Grants from trusts and foundations">Trusts</button>
+            <button type="button" class="filter-pill {% if funding_stream == 'individual_giving' %}active{% endif %}" data-group="stream" data-value="individual_giving" title="Regular donations from individual supporters">Individual</button>
+            <button type="button" class="filter-pill {% if funding_stream == 'legacy' %}active{% endif %}" data-group="stream" data-value="legacy" title="Income from gifts left in wills">Legacy</button>
+            <button type="button" class="filter-pill {% if funding_stream == 'corporate' %}active{% endif %}" data-group="stream" data-value="corporate" title="Partnerships and sponsorship from businesses">Corporate</button>
+            <button type="button" class="filter-pill {% if funding_stream == 'events' %}active{% endif %}" data-group="stream" data-value="events" title="Income from fundraising events">Events</button>
+            <button type="button" class="filter-pill {% if funding_stream == 'trading' %}active{% endif %}" data-group="stream" data-value="trading" title="Earned income from trading activities">Trading</button>
+            <button type="button" class="filter-pill {% if funding_stream == 'statutory' %}active{% endif %}" data-group="stream" data-value="statutory" title="Government or local authority funding">Statutory</button>
+          </div>
+          <div class="filter-row">
+            <span class="filter-label">Min score</span>
+            <input type="number" name="min_score" value="0" min="0" step="5" placeholder="0" class="filter-input" style="width:70px;">
+            <label class="toggle-label"><input type="checkbox" name="show_claimed" value="1"> Claimed</label>
+            <label class="toggle-label"><input type="checkbox" name="show_skipped" value="1"> Skipped</label>
+          </div>
+        </details>
+      </form>
+
+      {% set warm_count = items | selectattr('has_warm_path') | list | length %}
+      <p class="result-count">
+        Showing {{ items|length }} of {{ total }} opportunities
+        {% if warm_count %} &middot; <span style="color:#6d4c00" title="Organisations where you have a known contact">&#9733; {{ warm_count }} known connection{{ 's' if warm_count != 1 }}</span>{% endif %}
+        &middot; <a href="/api/pipeline/bulk-pdf?limit=20" title="Download top 20 reports as PDF zip" style="font-size:12px;text-decoration:none;">&#11015; Top 20 PDFs</a>
+      </p>
+
+      {# Scrollable card list #}
+      <div id="pipeline-card-list">
+        {% for item in items %}
+          {% include "components/card.html" %}
+        {% endfor %}
+
+        {% if items|length < total %}
+        <button class="btn-secondary load-more"
+                hx-get="/pipeline/cards?status=new,triaged&sort=biggest_movers&funding_model={{ funding_model or '' }}&funding_stream={{ funding_stream or '' }}&offset={{ offset + limit }}&limit={{ limit }}"
+                hx-target="#pipeline-card-list"
+                hx-swap="beforeend"
+                hx-on::after-request="this.remove()">
+          Load more ({{ total - items|length }} remaining)
+        </button>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  {# -- RIGHT PANEL: detail view -- #}
+  <div class="master-detail-content" id="pipeline-detail-panel">
+    <div class="detail-empty">
+      <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      <span>Select an organisation from the list to see details</span>
+      <span class="pipeline-hint">Keyboard: &uarr;/&darr; navigate &middot; Enter open &middot; c claim &middot; x skip &middot; Esc close</span>
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* Pipeline page -- local overrides */
+.filter-input { font-size: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--text-primary); background: var(--surface); height: 30px; min-width: 120px; flex: 1; font-family: 'Open Sans', sans-serif; }
+#pipeline-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+#pipeline-stats .stat-card { padding: 10px 12px; }
+#pipeline-stats .stat-card-number { font-size: 22px; }
+#pipeline-stats .stat-card-label { font-size: 11px; }
+.pipeline-hint { font-size: 0.8rem; color: var(--text-muted); }
+.pipeline-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+.pipeline-filters .filter-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+.pipeline-filters .filter-pill { padding: 3px 10px; font-size: 11.5px; }
+.nl-search-form { margin-bottom: 14px; }
+/* Fix 2 — taller input, but placeholder/font kept at the site's standard 13px so the
+   box looks bigger without oversized text. */
+.nl-search-input { width: 100%; box-sizing: border-box; font-size: 13px; font-family: 'Open Sans', sans-serif; border: 1.5px solid var(--border); border-radius: 8px; padding: 14px 16px; resize: vertical; color: var(--text-primary); min-height: 56px; line-height: 1.5; }
+.nl-search-input::placeholder { font-size: 13px; color: var(--text-muted); }
+.nl-search-input:focus { outline: none; border-color: var(--navy); }
+.nl-history { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px; box-shadow: var(--shadow-sm); }
+.nl-history-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-right: 4px; align-self: center; }
+.nl-history-item { font-size: 11px; padding: 3px 9px; background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 999px; cursor: pointer; font-family: 'Open Sans', sans-serif; }
+.nl-history-item:hover { border-color: var(--navy); color: var(--navy); }
+.nl-loading { margin-top: 6px; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.nl-spinner { width: 10px; height: 10px; border: 1.5px solid var(--border); border-top-color: var(--pink); border-radius: 50%; animation: nl-spin 0.7s linear infinite; }
+@keyframes nl-spin { to { transform: rotate(360deg); } }
+.nl-error { margin-top: 6px; font-size: 12px; color: var(--amber); background: var(--amber-soft); padding: 8px 10px; border-radius: 6px; border-left: 3px solid var(--amber); }
+.nl-search-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.nl-quick-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+.nl-quick-pill { font-size: 11px; padding: 2px 8px; }
+.recent-signals-row { gap: 4px; flex-wrap: wrap; }
+.recent-signals-row .recent-pill { font-size: 11px; padding: 3px 8px; background: var(--steel-soft); border-color: transparent; color: var(--steel); }
+.recent-signals-row .recent-pill.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.advanced-filters { margin-top: 4px; border-top: 1px dashed var(--border); padding-top: 8px; }
+.advanced-filters summary { cursor: pointer; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; padding: 4px 0; user-select: none; }
+.advanced-filters summary:hover { color: var(--text-primary); }
+.advanced-filters[open] summary { color: var(--text-primary); margin-bottom: 8px; }
+.advanced-filters .filter-row { margin-top: 6px; }
+.filter-select { font-size: 0.82rem; border: 1.5px solid var(--border); border-radius: 6px; padding: 0.28rem 0.5rem; color: var(--text-primary); background: #fff; height: 32px; font-family: 'Open Sans', sans-serif; }
+.toggle-label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; font-weight: 500; }
+.toggle-label input { width: auto; margin: 0; accent-color: var(--pink); }
+.filter-pill.frame-distress.active { background: var(--pink); border-color: var(--pink); color: #fff; }
+.filter-pill.frame-growth.active { background: #00ff87; border-color: #00ff87; color: var(--navy); }
+.fm-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; border: 1px solid transparent; white-space: nowrap; }
+.fm-diversified { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+.fm-grant-dependent { background: #fed7aa; color: #9a3412; border-color: #fb923c; }
+.fm-donor-led { background: #dbeafe; color: #1e40af; border-color: #60a5fa; }
+.fm-trading-earned { background: #ede9fe; color: #5b21b6; border-color: #a78bfa; }
+.fm-statutory-dependent { background: #e5e7eb; color: #374151; border-color: #9ca3af; }
+.fm-events-driven { background: #fce7f3; color: #9d174d; border-color: #f472b6; }
+#pipeline-card-list .card { cursor: pointer; margin-bottom: 24px; border-bottom: 1px solid #e8e8e8; }
+#pipeline-card-list .card.selected { border-left: 3px solid var(--pink) !important; background: var(--pink-soft); }
+
+/* Fix 8 — card header: income band matches org-name size, status badge inline */
+#pipeline-card-list .card .jc-org-name { font-size: 15px !important; font-weight: 700 !important; color: var(--navy) !important; }
+#pipeline-card-list .card .card-context { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px !important; color: var(--text-secondary) !important; margin: 4px 0 6px !important; }
+#pipeline-card-list .card .card-context > span { line-height: 1.3; }
+#pipeline-card-list .card .card-context .ctx-income { font-size: 15px; font-weight: 700; color: var(--navy); }
+#pipeline-card-list .card .card-context .status-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+#pipeline-card-list .card .card-context .status-new { background: #e3f2fd; color: #1565c0; }
+#pipeline-card-list .card .card-context .status-triaged { background: var(--amber-soft); color: var(--amber); }
+#pipeline-card-list .card .card-context .status-pursuing { background: var(--green-soft); color: var(--green); }
+#pipeline-card-list .card .card-context .status-monitoring { background: var(--steel-soft); color: var(--steel); }
+
+/* Fix 9 — signals label matches pitch label */
+#pipeline-card-list .card .signals { font-size: 12.5px !important; color: var(--text-primary) !important; line-height: 1.5 !important; margin: 6px 0 !important; }
+#pipeline-card-list .card .signals strong { color: var(--navy); font-weight: 700; text-transform: none; letter-spacing: normal; font-size: inherit; }
+
+/* Fix 10 — action buttons look clickable */
+#pipeline-card-list .card .card-action-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 !important; }
+/* Three-button action row — outline style in Fern Talent teal. */
+#pipeline-card-list .card .btn-card-action { font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 4px; border: 1px solid #1B4D4D; background: var(--surface); color: #1B4D4D; text-decoration: none; cursor: pointer; font-family: 'Open Sans', sans-serif; line-height: 1.2; display: inline-block; transition: background 120ms, color 120ms; }
+#pipeline-card-list .card .btn-card-action:hover { background: #1B4D4D; color: #fff; }
+#pipeline-card-list .card .btn-card-action.loading { opacity: 0.7; pointer-events: none; }
+
+/* Fix 11 — claim dropdown */
+.claim-dropdown { position: relative; display: inline-block; }
+.claim-dropdown .claim-toggle { background: var(--navy); color: #fff; border: 1px solid var(--navy); padding: 6px 14px; font-size: 12px; font-weight: 700; border-radius: 5px; cursor: pointer; font-family: 'Open Sans', sans-serif; }
+.claim-dropdown .claim-toggle:hover { background: #1a3147; }
+.claim-dropdown .claim-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); z-index: 20; overflow: hidden; }
+.claim-dropdown.open .claim-menu { display: block; }
+.claim-dropdown .claim-menu-item { display: block; width: 100%; text-align: left; background: none; border: none; padding: 8px 14px; font-size: 13px; color: var(--text-primary); cursor: pointer; font-family: 'Open Sans', sans-serif; }
+.claim-dropdown .claim-menu-item:hover { background: var(--pink-soft); color: var(--navy); }
+#pipeline-card-list .card .skip-btn { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer; font-family: 'Open Sans', sans-serif; }
+#pipeline-card-list .card .skip-btn:hover { background: var(--red-soft); color: var(--red); border-color: var(--red); }
+</style>
+
+<script>
+(function() {
+    var form = document.getElementById('filters');
+    if (!form) return;
+    var searchBtn = document.getElementById('search-btn');
+    var map = {
+      status: 'val-status',
+      frame: 'val-frame',
+      band: 'val-band',
+      sort: 'val-sort',
+      stream: 'val-stream',
+      region: 'val-region',
+      income: 'val-income',
+      'signal-tag': 'val-signal-tag'
+    };
+
+    var pulse = function() { if (searchBtn) searchBtn.classList.add('search-pulse'); };
+    var unpulse = function() { if (searchBtn) searchBtn.classList.remove('search-pulse'); };
+
+    /* Pills update hidden inputs and pulse the Search button */
+    form.querySelectorAll('.filter-pill[data-group]').forEach(function(pill) {
+        pill.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            var group = this.dataset.group;
+            var target = document.getElementById(map[group]);
+            /* Recent-signals group: click an already-active pill to toggle off */
+            if (group === 'signal-tag' && this.classList.contains('active')) {
+                this.classList.remove('active');
+                if (target) target.value = '';
+                pulse();
+                form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                return;
+            }
+            form.querySelectorAll('.filter-pill[data-group="' + group + '"]').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
+            if (target) target.value = this.dataset.value || '';
+            pulse();
+            /* Recent-signals and stream pills submit immediately — no "All" fallback needed */
+            if (group === 'signal-tag') {
+                form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
+        });
+    });
+
+    form.querySelectorAll('select, input[type=text], input[type=number], input[type=checkbox]').forEach(function(el) {
+        el.addEventListener('change', pulse);
+        if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number')) {
+            el.addEventListener('input', pulse);
+        }
+    });
+
+    form.addEventListener('htmx:beforeRequest', unpulse);
+
+    /* NL quick-try pills */
+    document.querySelectorAll('.nl-quick-pill').forEach(function(pill) {
+        pill.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            var ta = document.querySelector('.nl-search-form textarea[name="nl_query"]');
+            if (ta) {
+                ta.value = this.dataset.query;
+                ta.closest('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
+        });
+    });
+
+    /* Card selection -- click to load detail */
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest('#pipeline-card-list .card');
+        if (!card) return;
+        if (e.target.closest('a, button, input, select, textarea, details, summary, .reveal-email')) return;
+        document.querySelectorAll('#pipeline-card-list .card.selected').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+    });
+
+    /* Click-to-reveal masked emails (rendered by claim_status.html). Delegated
+       at document level so it works for HTMX-inserted fragments without
+       rebinding. One click swaps the masked text for the real email from the
+       data-value attribute. */
+    document.addEventListener('click', function(e) {
+        var el = e.target.closest('.reveal-email');
+        if (!el) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var real = el.getAttribute('data-value');
+        if (real && el.textContent.trim() !== real) {
+            el.textContent = real;
+            el.style.cursor = 'default';
+            el.setAttribute('title', 'Revealed');
+        }
+    });
+
+    /* Keyboard navigation + shortcuts.
+       Arrow/jk — navigate cards. Enter — reopen detail. c — claim (Tim).
+       x — skip. Escape — unselect. s — no-op toast (shortlist is on jobs only). */
+    function _detailAction(hxSel) {
+        var panel = document.getElementById('pipeline-detail-panel');
+        if (!panel) return false;
+        var el = panel.querySelector(hxSel);
+        if (!el) return false;
+        /* HTMX reads its triggers from click events by default. */
+        el.click();
+        return true;
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        if (e.target.isContentEditable) return;
+        var cards = Array.from(document.querySelectorAll('#pipeline-card-list .card'));
+        if (!cards.length && e.key !== 'Escape') return;
+        var selected = document.querySelector('#pipeline-card-list .card.selected');
+        var idx = selected ? cards.indexOf(selected) : -1;
+
+        if (e.key === 'ArrowDown' || e.key === 'j') {
+            e.preventDefault();
+            idx = Math.min(idx + 1, cards.length - 1);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp' || e.key === 'k') {
+            e.preventDefault();
+            idx = Math.max(idx - 1, 0);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+            if (selected) { e.preventDefault(); selected.click(); }
+        } else if (e.key === 'c' || e.key === 'C') {
+            if (!selected) return;
+            e.preventDefault();
+            /* Claim for Tim by default — matches the first claim link in the detail.
+               Accept both <a> and <button> so the shortcut survives the
+               PR #355 switch from <a hx-post> to <button hx-post> inside
+               the dropdown (Codex flagged the regression). */
+            var ok = _detailAction('a[hx-post*="/claim"][hx-vals*="Tim"], button[hx-post*="/claim"][hx-vals*="Tim"]')
+                  || _detailAction('a[hx-post*="/claim"], button[hx-post*="/claim"]');
+            if (ok) showToast('Claimed for Tim', 'success');
+        } else if (e.key === 'x' || e.key === 'X') {
+            if (!selected) return;
+            e.preventDefault();
+            var ok = _detailAction('a[hx-post*="/skip"], button[hx-post*="/skip"]');
+            if (ok) showToast('Skipped', 'success');
+        } else if (e.key === 's' || e.key === 'S') {
+            if (!selected) return;
+            e.preventDefault();
+            showToast('Shortlist applies to jobs, not orgs. Use Claim (c) or Skip (x).', 'info');
+        } else if (e.key === 'Escape') {
+            document.querySelectorAll('#pipeline-card-list .card.selected').forEach(function(c) { c.classList.remove('selected'); });
+            var panel = document.getElementById('pipeline-detail-panel');
+            if (panel) panel.innerHTML = '<div class="detail-empty"><span>Select an organisation from the list to see details</span><span class="pipeline-hint">Use &uarr;/&darr; to navigate, Enter to open, c to claim, x to skip</span></div>';
+        }
+    });
+
+    /* Auto-select first card after HTMX initialises.
+       DOMContentLoaded may have already fired by the time this IIFE runs,
+       so check readyState and trigger HTMX explicitly rather than .click(). */
+    function _autoSelectFirstCard() {
+        var first = document.querySelector('#pipeline-card-list .card');
+        if (!first) return;
+        document.querySelectorAll('#pipeline-card-list .card.selected').forEach(function(c) { c.classList.remove('selected'); });
+        first.classList.add('selected');
+        if (window.htmx) { window.htmx.trigger(first, 'click'); }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(_autoSelectFirstCard, 50); });
+    } else {
+        setTimeout(_autoSelectFirstCard, 50);
+    }
+
+    /* Close claim dropdowns when clicking outside */
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.claim-dropdown')) return;
+        document.querySelectorAll('.claim-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+    });
+
+    /* Single-open discipline for the detail-panel <details class="jc-dropdown">
+       (Claim menu on pipeline_detail.html, standardised to jc-dropdown in
+       PR #359). Without this, opening Claim while another jc-dropdown was
+       open leaves both visible and overlapping. The `toggle` event doesn't
+       bubble — capture phase. */
+    document.addEventListener('toggle', function(e) {
+        var t = e.target;
+        if (!t || !t.classList || !t.classList.contains('jc-dropdown') || !t.open) return;
+        document.querySelectorAll('.jc-dropdown[open]').forEach(function(d) {
+            if (d !== t) d.open = false;
+        });
+    }, true);
+
+    /* And close jc-dropdowns on outside click (same pattern as the
+       .claim-dropdown handler above). */
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.jc-dropdown')) return;
+        document.querySelectorAll('.jc-dropdown[open]').forEach(function(d) { d.open = false; });
+    });
+
+    /* After the user claims or skips an opportunity, the server fires
+       `HX-Trigger: pipelineTriaged`. The claim fragment replaces the
+       list card in-place with a "Claimed by X" block; skip removes it
+       entirely. Either way, clear the detail panel and advance to the
+       next open (not-yet-claimed) opportunity so the triage loop keeps
+       flowing. If the remaining open list is running low, auto-click
+       the Load More button to append a new card at the bottom. */
+    document.body.addEventListener('pipelineTriaged', function(ev) {
+        /* Pipeline cards let the user claim or skip directly from the
+           list row without opening the detail panel first. Only wipe
+           and advance the detail panel if the triaged org IS the one
+           the user currently has open — otherwise leave the detail view
+           untouched so background actions don't steal focus (Codex P2
+           on #355). `ev.detail.org_id` comes from the HX-Trigger
+           payload set by /api/triage/{org_id}/claim and /skip. */
+        var triagedOrg = ev && ev.detail && ev.detail.org_id;
+        var selected = document.querySelector('#pipeline-card-list .card.selected');
+        var selectedOrg = selected ? selected.id.replace(/^card-/, '') : '';
+        if (selected && selectedOrg !== triagedOrg) {
+            /* Background action — still top up the list if it got short,
+               but keep the detail panel focused on what the user was
+               reading. */
+            var openBg = document.querySelectorAll('#pipeline-card-list .card:not(.card-claimed)');
+            var moreBg = document.querySelector('#pipeline-card-list .load-more');
+            if (openBg.length < 5 && moreBg) moreBg.click();
+            return;
+        }
+
+        var panel = document.getElementById('pipeline-detail-panel');
+        if (panel) {
+            panel.innerHTML = '<div class="detail-empty"><svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg><span>Select an organisation from the list to see details</span><span class="pipeline-hint">Keyboard: &uarr;/&darr; navigate &middot; Enter open &middot; c claim &middot; x skip &middot; Esc close</span></div>';
+        }
+        setTimeout(function() {
+            /* Count only cards still open for triage (not already claimed).
+               Fire Load More whenever the open list drops below 5,
+               including the zero-remaining case — otherwise triage
+               stalls with an empty panel after the user claims/skips
+               the last visible opportunity (Codex P2 flagged this on
+               #355). The next auto-select for the zero case happens on
+               htmx:afterSwap below, once Load More's beforeend swap
+               lands. */
+            var open = document.querySelectorAll('#pipeline-card-list .card:not(.card-claimed)');
+            var more = document.querySelector('#pipeline-card-list .load-more');
+            if (open.length < 5 && more) {
+                more.click();
+            }
+            var next = document.querySelector('#pipeline-card-list .card:not(.card-claimed)');
+            if (next) {
+                document.querySelectorAll('#pipeline-card-list .card.selected').forEach(function(c) { c.classList.remove('selected'); });
+                next.classList.add('selected');
+                if (window.htmx) { window.htmx.trigger(next, 'click'); }
+            }
+        }, 50);
+    });
+
+    /* After a Load More swap lands, select the first open card if the
+       detail panel is currently empty — covers the "triaged the last
+       open card, queue was zero, Load More just refilled" path. */
+    document.body.addEventListener('htmx:afterSwap', function(ev) {
+        if (!ev.target || ev.target.id !== 'pipeline-card-list') return;
+        var panel = document.getElementById('pipeline-detail-panel');
+        var isEmpty = panel && panel.querySelector('.detail-empty');
+        if (!isEmpty) return;
+        var next = document.querySelector('#pipeline-card-list .card:not(.card-claimed)');
+        if (next) {
+            document.querySelectorAll('#pipeline-card-list .card.selected').forEach(function(c) { c.classList.remove('selected'); });
+            next.classList.add('selected');
+            if (window.htmx) { window.htmx.trigger(next, 'click'); }
+        }
+    });
+
+    /* Fix 10 — visual feedback on action buttons */
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('#pipeline-card-list .btn-card-action');
+        if (!btn) return;
+        var label = btn.textContent;
+        btn.classList.add('loading');
+        btn.textContent = label.indexOf('PDF') >= 0 ? 'Generating…' : 'Opening…';
+        setTimeout(function() { btn.classList.remove('loading'); btn.textContent = label; }, 1500);
+    });
+
+    /* --- NL search polish: history (localStorage) + loading + errors --- */
+    document.querySelectorAll('.nl-search-form').forEach(function(nlForm) {
+        var key = nlForm.dataset.nlHistoryKey || 'nl_history_default';
+        var ta = nlForm.querySelector('textarea[name="nl_query"]');
+        var historyBox = nlForm.querySelector('.nl-history');
+        var loadingBox = nlForm.querySelector('.nl-loading');
+        var errorBox = nlForm.querySelector('.nl-error');
+        if (!ta) return;
+
+        function loadHistory() {
+            try {
+                var raw = localStorage.getItem(key);
+                return raw ? JSON.parse(raw).slice(0, 5) : [];
+            } catch (e) { return []; }
+        }
+        function saveQuery(q) {
+            if (!q || q.length < 3) return;
+            try {
+                var list = loadHistory().filter(function(x){ return x !== q; });
+                list.unshift(q);
+                localStorage.setItem(key, JSON.stringify(list.slice(0, 5)));
+            } catch (e) {}
+        }
+        function renderHistory() {
+            if (!historyBox) return;
+            var list = loadHistory();
+            if (!list.length || ta.value.trim() !== '') { historyBox.hidden = true; return; }
+            historyBox.innerHTML = '<span class="nl-history-label">Recent</span>' +
+                list.map(function(q) {
+                    var esc = q.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+                    return '<button type="button" class="nl-history-item" data-query="' + esc + '">' + esc + '</button>';
+                }).join('');
+            historyBox.hidden = false;
+            historyBox.querySelectorAll('.nl-history-item').forEach(function(btn) {
+                btn.addEventListener('click', function(ev) {
+                    ev.preventDefault();
+                    ta.value = this.dataset.query;
+                    historyBox.hidden = true;
+                    nlForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                });
+            });
+        }
+
+        ta.addEventListener('focus', renderHistory);
+        ta.addEventListener('input', function() {
+            if (historyBox) historyBox.hidden = ta.value.trim() !== '' || !loadHistory().length;
+        });
+        ta.addEventListener('blur', function() {
+            /* Delay hiding so a history click can fire first. */
+            setTimeout(function() { if (historyBox) historyBox.hidden = true; }, 150);
+        });
+
+        nlForm.addEventListener('htmx:beforeRequest', function() {
+            if (historyBox) historyBox.hidden = true;
+            if (errorBox) errorBox.hidden = true;
+            if (loadingBox) loadingBox.hidden = false;
+        });
+        nlForm.addEventListener('htmx:afterRequest', function(ev) {
+            if (loadingBox) loadingBox.hidden = true;
+            if (ev.detail && ev.detail.successful) {
+                saveQuery(ta.value.trim());
+            } else if (errorBox) {
+                errorBox.textContent = 'Natural language search is temporarily unavailable. Use the filters below instead.';
+                errorBox.hidden = false;
+            }
+        });
+        nlForm.addEventListener('htmx:responseError', function() {
+            if (loadingBox) loadingBox.hidden = true;
+            if (errorBox) {
+                errorBox.textContent = 'Natural language search is temporarily unavailable. Use the filters below instead.';
+                errorBox.hidden = false;
+            }
+        });
+    });
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,92 @@
+<article class="dossier-panel">
+    <header><h3 class="ds-label" style="margin:0;">5-Year Financial Trend</h3></header>
+
+    {% if not trend %}
+        <p class="panel-empty">
+            {% if charity_number %}
+                No multi-year data yet — the Charity Commission enrichment pipeline
+                runs nightly at 05:30 UTC and will populate this once the charity
+                reaches the priority queue.
+            {% else %}
+                No registered charity number for this org, so the Charity Commission
+                API can&rsquo;t be queried.
+            {% endif %}
+        </p>
+    {% elif trend|length < 2 %}
+        <p class="panel-empty">Only one filed year available; need at least two to
+           draw a trend line.</p>
+    {% else %}
+        {% if yoy_delta %}
+            <div class="insight-box">
+                Income
+                {% if yoy_delta.direction == 'up' %}
+                    <strong class="{{ yoy_delta.magnitude_class }}">&uarr; {{ yoy_delta.pct }}% YoY</strong>
+                {% else %}
+                    <strong class="{{ yoy_delta.magnitude_class }}">&darr; {{ (yoy_delta.pct|abs) }}% YoY</strong>
+                {% endif %}
+                on the most recent filing vs the prior year.
+                {% set first = trend[0] %}
+                {% set last = trend[-1] %}
+                {% if first.get('income_total') and last.get('income_total') %}
+                    Over the full 5-year window: income moved from
+                    &pound;{{ "{:,.0f}".format(first['income_total']) }}
+                    to &pound;{{ "{:,.0f}".format(last['income_total']) }}.
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if chart_b64 %}
+            <img src="data:image/png;base64,{{ chart_b64 }}"
+                 alt="Income and expenditure over the last 5 years"
+                 style="max-width:100%; height:auto; margin-top:8px;">
+        {% endif %}
+
+        <details style="margin-top:12px;">
+            <summary style="cursor:pointer; color:var(--text-muted); font-size:12px;">
+                Year-by-year breakdown
+            </summary>
+            <table role="grid" style="margin-top:8px;">
+                <thead>
+                    <tr>
+                        <th>Year end</th>
+                        <th style="text-align:right;">Income</th>
+                        <th style="text-align:right;">Expenditure</th>
+                        <th style="text-align:right;">Charitable activities</th>
+                        <th style="text-align:right;">Donations &amp; legacies</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in trend|reverse %}
+                    <tr>
+                        <td>{{ row.financial_period_end }}</td>
+                        <td style="text-align:right;">
+                            {% if row.get('income_total') is not none %}
+                                &pound;{{ "{:,.0f}".format(row['income_total']) }}
+                            {% else %}&mdash;{% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            {% if row.get('expenditure_total') is not none %}
+                                &pound;{{ "{:,.0f}".format(row['expenditure_total']) }}
+                            {% else %}&mdash;{% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            {% if row.get('income_charitable_activities') is not none %}
+                                &pound;{{ "{:,.0f}".format(row['income_charitable_activities']) }}
+                            {% else %}&mdash;{% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            {% if row.get('income_donations_and_legacies') is not none %}
+                                &pound;{{ "{:,.0f}".format(row['income_donations_and_legacies']) }}
+                            {% else %}&mdash;{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+                Source: Charity Commission Register API
+                (<code>/charityfinancialhistory</code>).
+            </p>
+        </details>
+    {% endif %}
+</article>

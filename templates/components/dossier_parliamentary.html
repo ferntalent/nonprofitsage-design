@@ -1,0 +1,57 @@
+<article class="dossier-panel">
+    <header><h3 class="ds-label" style="margin:0;">Parliamentary Mentions</h3></header>
+    {% if parliamentary %}
+    <table role="grid">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Speaker</th>
+                <th>Debate</th>
+                <th>Excerpt</th>
+                <th>Signal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in parliamentary[:15] %}
+            <tr>
+                <td>
+                    {% set md = m.get('mention_date', '') or '' %}
+                    {{ md[:10] if md else '—' }}
+                </td>
+                <td>{{ m.get('speaker_name', '') or '—' }}</td>
+                <td>
+                    {% set title = m.get('debate_title', '') or '' %}
+                    {% set url = m.get('hansard_url', '') or '' %}
+                    {% if url %}
+                        <a href="{{ url }}" target="_blank" rel="noopener">{{ title[:80] }}{% if title|length > 80 %}…{% endif %}</a>
+                    {% else %}
+                        {{ title[:80] }}{% if title|length > 80 %}…{% endif %}
+                    {% endif %}
+                </td>
+                <td>
+                    {% set excerpt = m.get('excerpt', '') or '' %}
+                    <small>{{ excerpt[:150] }}{% if excerpt|length > 150 %}…{% endif %}</small>
+                </td>
+                <td>
+                    {% set sig = m.get('signal_type', '') or '' %}
+                    {% if 'distress' in sig %}
+                        <span class="severity severity-high">Distress</span>
+                    {% elif sig %}
+                        <span class="severity severity-low">Mention</span>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if parliamentary|length > 15 %}
+    <p class="panel-note">Showing 15 of {{ parliamentary|length }} mentions</p>
+    {% endif %}
+    {% elif error_message is defined and error_message %}
+    <p class="panel-empty">{{ error_message }}</p>
+    {% else %}
+    <p class="panel-empty">No parliamentary mentions found for this organisation.</p>
+    {% endif %}
+</article>

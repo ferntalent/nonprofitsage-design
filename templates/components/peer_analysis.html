@@ -1,0 +1,275 @@
+{# Macro: render a long prose blob from Haiku as readable HTML.
+   Splits on blank lines for paragraphs; lines starting with -, *, or • in
+   a paragraph become a <ul>. Otherwise the paragraph is a <p>. A long
+   section (>600 chars) is wrapped in a show-more <details>. #}
+{% macro render_analysis_block(text) -%}
+    {%- set _text = (text or '') | trim -%}
+    {%- set _blocks = _text.replace('\r\n', '\n').split('\n\n') -%}
+    {%- if _text | length > 600 -%}
+      <details class="peer-analysis-more">
+      <summary>Show full analysis</summary>
+    {%- endif -%}
+    {%- for block in _blocks -%}
+      {%- set _lines = block.strip().split('\n') -%}
+      {%- set ns = namespace(all_bullets=true) -%}
+      {%- for ln in _lines -%}
+        {%- set _ls = ln | trim -%}
+        {%- if not (_ls.startswith('- ') or _ls.startswith('* ') or _ls.startswith('• ')) -%}
+          {%- set ns.all_bullets = false -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if _lines | length >= 2 and ns.all_bullets -%}
+        <ul class="peer-analysis-list">
+        {%- for line in _lines -%}
+          {%- set _ls = line | trim -%}
+          {%- if _ls.startswith('- ') or _ls.startswith('* ') -%}
+            <li>{{ _ls[2:] | trim }}</li>
+          {%- elif _ls.startswith('• ') -%}
+            <li>{{ _ls[2:] | trim }}</li>
+          {%- else -%}
+            <li>{{ _ls }}</li>
+          {%- endif -%}
+        {%- endfor -%}
+        </ul>
+      {%- else -%}
+        <p class="peer-analysis-para">{{ block | trim }}</p>
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if _text | length > 600 -%}
+      </details>
+    {%- endif -%}
+{%- endmacro %}
+
+<article class="dossier-panel" id="peer-analysis-panel">
+    <header style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+        <div>
+            <h3 class="ds-label" style="margin:0;">Strategic peer analysis</h3>
+            <p style="margin:4px 0 0 0; font-size:12px; color:var(--text-muted);">
+                AI-selected peers across six comparison angles — financial, geographic, cause, aspirational, local competition, and operational model — plus a SWOT summary.
+            </p>
+        </div>
+        <button type="button"
+                hx-post="/api/org/{{ org_id }}/panel/peer-analysis/refresh"
+                hx-target="#peer-analysis-container"
+                hx-swap="innerHTML"
+                hx-indicator="#peer-analysis-regen-spinner"
+                title="Regenerate the analysis — costs one Haiku call"
+                style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap;">
+            Regenerate
+            <span id="peer-analysis-regen-spinner" class="htmx-indicator" aria-hidden="true">…</span>
+        </button>
+    </header>
+
+    {% if is_stale %}
+    <div role="status"
+         style="background:var(--amber-soft); border:1px solid var(--amber); border-radius:6px; padding:10px 14px; margin:12px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; color:var(--amber);">
+        <span>
+            Peer analysis generated <strong>{{ generated_label }}</strong>. Relationships in the sector may have shifted — consider regenerating.
+        </span>
+        <button type="button"
+                hx-post="/api/org/{{ org_id }}/panel/peer-analysis/refresh"
+                hx-target="#peer-analysis-container"
+                hx-swap="innerHTML"
+                style="background:var(--pink); color:#fff; border:0; padding:5px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">
+            Refresh now
+        </button>
+    </div>
+    {% endif %}
+
+    {# --- Section 1: Peers table --- #}
+    {% if peers %}
+    <table role="grid" class="peer-table">
+        <thead>
+            <tr>
+                <th class="peer-th-name">Peer organisation</th>
+                <th class="peer-th-angle">Benchmarking angle</th>
+                <th class="peer-th-income">Approx. income</th>
+                <th class="peer-th-why">Why they matter</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in peers %}
+            <tr>
+                <td class="peer-td-name">
+                    {% if p.matched_org_id %}
+                        <a href="/org/{{ p.matched_org_id }}">{{ p.name }}</a>
+                    {% else %}
+                        <span>{{ p.name }}</span>
+                    {% endif %}
+                </td>
+                <td class="peer-td-angle">
+                    <span class="peer-angle-badge">{{ p.benchmarking_metric }}</span>
+                </td>
+                <td class="peer-td-income">{{ p.approx_income or '—' }}</td>
+                <td class="peer-td-why">{{ p.rationale }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--text-muted); font-size:13px;">No peers returned by the model — try Regenerate.</p>
+    {% endif %}
+
+    {# --- Section 2: Competitive analysis --- #}
+    {% if competitive_analysis %}
+    <section style="margin-top:18px;">
+        <div class="ds-label">Competitive analysis</div>
+        {% set _ca_sections = [
+            ('financial_resilience', 'Financial resilience & income diversification'),
+            ('brand_positioning', 'Brand positioning & share of voice'),
+            ('operational_model', 'Operational model & service agility'),
+            ('talent_volunteers', 'Talent & volunteer acquisition'),
+        ] %}
+        {% for key, label in _ca_sections %}
+            {% if competitive_analysis.get(key) %}
+            <details class="peer-analysis-section">
+                <summary>{{ label }}</summary>
+                <div class="peer-analysis-body">
+                    {{ render_analysis_block(competitive_analysis[key]) }}
+                </div>
+            </details>
+            {% endif %}
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {# --- Section 3: SWOT --- #}
+    {% if swot %}
+    <section style="margin-top:18px;">
+        <div class="ds-label">SWOT summary</div>
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-top:8px;">
+            {% set _swot_cells = [
+                ('strengths',    'Strengths',    'var(--green-soft)', 'var(--green)'),
+                ('weaknesses',   'Weaknesses',   'var(--amber-soft)', 'var(--amber)'),
+                ('opportunities','Opportunities','var(--steel-soft)', 'var(--steel)'),
+                ('threats',      'Threats',      'var(--red-soft)',   'var(--red)'),
+            ] %}
+            {% for key, label, bg, fg in _swot_cells %}
+            <div style="background:{{ bg }}; border-left:3px solid {{ fg }}; border-radius:6px; padding:10px 14px;">
+                <div style="font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:{{ fg }}; margin-bottom:6px;">{{ label }}</div>
+                {% if swot.get(key) %}
+                <ul style="margin:0; padding-left:18px; font-size:12.5px; color:var(--text-primary); line-height:1.55;">
+                    {% for item in swot[key] %}<li style="margin-bottom:3px;">{{ item }}</li>{% endfor %}
+                </ul>
+                {% else %}
+                <p style="margin:0; font-size:12px; color:var(--text-muted);">—</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if generated_label and not is_stale %}
+    <p style="margin-top:14px; font-size:11px; color:var(--text-muted); text-align:right;">
+        Generated {{ generated_label }}{% if model_used %} · {{ model_used }}{% endif %}
+    </p>
+    {% endif %}
+</article>
+
+<style>
+/* Peer analysis table — Bug 4 */
+.peer-table {
+    width: 100%;
+    margin-top: 12px;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.peer-table thead th {
+    text-align: left;
+    vertical-align: bottom;
+    padding: 6px 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1.5px solid var(--border);
+    background: transparent;
+}
+.peer-th-name  { width: 24%; }
+.peer-th-angle { width: 18%; }
+.peer-th-income { width: 12%; text-align: right !important; }
+.peer-th-why   { width: auto; }
+.peer-table tbody td {
+    padding: 10px 8px;
+    vertical-align: top;
+    border-bottom: 1px solid #e8e8e8;
+}
+.peer-table tbody tr:last-child td { border-bottom: none; }
+.peer-td-name { font-weight: 700; color: var(--text-primary); }
+.peer-td-name a { color: var(--navy); text-decoration: none; font-weight: 700; }
+.peer-td-name a:hover { text-decoration: underline; }
+.peer-td-angle { white-space: nowrap; }
+.peer-angle-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--steel-soft);
+    color: var(--steel);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+.peer-td-income {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    text-align: right;
+    white-space: nowrap;
+}
+.peer-td-why {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    max-width: 400px;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+/* Peer analysis readability — Bug 3 */
+.peer-analysis-section {
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    background: var(--bg);
+}
+.peer-analysis-section > summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--navy);
+    font-size: 13px;
+    list-style: none;
+}
+.peer-analysis-section > summary::-webkit-details-marker { display: none; }
+.peer-analysis-section > summary::before {
+    content: "▸";
+    color: var(--text-muted);
+    margin-right: 6px;
+    font-size: 10px;
+    display: inline-block;
+    transition: transform 120ms ease;
+}
+.peer-analysis-section[open] > summary::before { transform: rotate(90deg); }
+.peer-analysis-body { margin-top: 10px; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+.peer-analysis-body .peer-analysis-para { margin: 0 0 0.5em; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+.peer-analysis-body .peer-analysis-para:last-child { margin-bottom: 0; }
+.peer-analysis-body .peer-analysis-list { margin: 0 0 0.5em; padding-left: 22px; }
+.peer-analysis-body .peer-analysis-list li { margin-bottom: 4px; line-height: 1.55; }
+.peer-analysis-body .peer-analysis-more > summary {
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--pink);
+    list-style: none;
+    padding: 6px 0;
+}
+.peer-analysis-body .peer-analysis-more > summary::-webkit-details-marker { display: none; }
+.peer-analysis-body .peer-analysis-more > summary::before {
+    content: "+ ";
+    color: var(--pink);
+    font-weight: 700;
+}
+.peer-analysis-body .peer-analysis-more[open] > summary::before { content: "− "; }
+</style>

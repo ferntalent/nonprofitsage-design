@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 50" width="340" height="50">
+  <circle cx="14" cy="14" r="10" fill="#FF4FBE"/>
+  <circle cx="40" cy="14" r="10" fill="#7BA7D7"/>
+  <circle cx="14" cy="40" r="10" fill="#C4B3D9"/>
+  <circle cx="40" cy="40" r="10" fill="#A8D0E8"/>
+  <text x="64" y="35" font-family="'Open Sans', sans-serif" font-size="26" font-weight="700" letter-spacing="-0.3px"><tspan fill="#0d1f2d">Nonprofit</tspan><tspan fill="#FF4FBE">Sage</tspan><tspan fill="#0d1f2d">.ai</tspan></text>
+</svg>

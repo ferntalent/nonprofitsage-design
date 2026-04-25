@@ -1,0 +1,148 @@
+<article class="dossier-panel">
+    <header><h3 class="ds-label" style="margin:0;">Grant Funding <small style="font-weight:normal;color:var(--text-muted);">(from 360Giving)</small></h3></header>
+
+    {% if grants %}
+    <div class="grants-summary">
+        {# Narrative summary #}
+        <p>
+            {{ org_name | smart_org }} has received {{ grants.total_grants }} grant{{ 's' if grants.total_grants != 1 else '' }}
+            totalling {{ grants.total_amount | currency }} from published funders.
+            {% if grants.avg_amount %}
+            Average grant: {{ grants.avg_amount | currency }}
+            {% endif %}
+            {% if grants.max_amount %}
+            &middot; Largest: {{ grants.max_amount | currency }}
+            {% endif %}
+            {% if grants.min_amount %}
+            &middot; Smallest: {{ grants.min_amount | currency }}
+            {% endif %}
+        </p>
+
+        {% if grants.grant_trend %}
+        <p>
+            Trend:
+            {% if grants.grant_trend == 'increasing' %}
+                <strong style="color:var(--green);">increasing</strong>
+            {% elif grants.grant_trend == 'declining' %}
+                <strong style="color:var(--red);">declining</strong>
+            {% else %}
+                <strong>stable</strong>
+            {% endif %}
+            over the last 4 years.
+        </p>
+        {% endif %}
+
+        {# Grant cliff warnings from pre-computed signals #}
+        {% if grant_signals %}
+        <div class="grant-signals">
+            {% for sig in grant_signals %}
+            <div class="insight-box" style="border-left-color:var(--amber);background:var(--amber-soft);margin-bottom:6px;">
+                &#x26A0;&#xFE0F; {{ sig }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Funding cliff detection (from 360Giving data analysis) #}
+        {% if grants.funding_cliffs %}
+        <div class="funding-cliffs">
+            {% for cliff in grants.funding_cliffs %}
+            <div class="insight-box" style="border-left-color:var(--amber);background:var(--amber-soft);margin-bottom:6px;">
+                &#x26A0;&#xFE0F; <strong>Potential funding cliff:</strong> {{ cliff.funder }}
+                &mdash; {{ cliff.grant_count }} grants totalling {{ cliff.total_given | currency }},
+                last awarded {{ cliff.last_grant_date }} ({{ cliff.months_since }} months ago).
+                {% if cliff.avg_frequency_months %}Previously gave every ~{{ cliff.avg_frequency_months }} months.{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Grant concentration analysis #}
+        {% if grants.concentration and grants.concentration.narrative %}
+        <div class="insight-box" style="margin-bottom:8px;">
+            {% if grants.concentration.direction == 'declining' or grants.concentration.direction == 'concentrating' %}
+                <strong style="color:var(--red);">{{ grants.concentration.narrative }}</strong>
+            {% elif grants.concentration.direction == 'growing' %}
+                <strong style="color:var(--green);">{{ grants.concentration.narrative }}</strong>
+            {% else %}
+                {{ grants.concentration.narrative }}
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {# Top funders #}
+        {% if grants.top_funders %}
+        <h4 class="ds-label">Top Funders</h4>
+        <ol class="top-funders">
+            {% for f in grants.top_funders[:5] %}
+            <li>
+                <strong>{{ f.funder_name }}</strong> —
+                {{ f.total_amount | currency }} across {{ f.grant_count }} grant{{ 's' if f.grant_count != 1 else '' }}
+            </li>
+            {% endfor %}
+        </ol>
+        {% endif %}
+
+        {# Recent grants #}
+        {% if grants.recent_grants %}
+        <h4 class="ds-label">Recent Grants</h4>
+        <ul class="recent-grants">
+            {% for g in grants.recent_grants[:10] %}
+            <li>
+                <strong>{{ g.amount | currency }}</strong> from {{ g.funder_name }}
+                {% if g.award_date %}
+                    {% set d = g.award_date_parsed %}
+                    {% if d %}
+                        ({{ d.strftime('%b %Y') }})
+                    {% endif %}
+                {% endif %}
+                {% if g.title or g.description %}
+                    — "{{ g.title or g.description }}"
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% if grants.recent_grants | length > 10 %}
+        <p class="panel-note">Showing 10 of {{ grants.recent_grants | length }} recent grants</p>
+        {% endif %}
+        {% endif %}
+
+        {# Year-on-year summary table #}
+        {% if grants.yoy_summary %}
+        <h4 class="ds-label">Year-on-Year Breakdown</h4>
+        <table role="grid">
+            <thead>
+                <tr>
+                    <th>Year</th>
+                    <th>Grants</th>
+                    <th>Total</th>
+                    <th>Funders</th>
+                    <th>Avg Grant</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in grants.yoy_summary %}
+                <tr>
+                    <td>{{ row.year }}</td>
+                    <td>{{ row.count }}</td>
+                    <td>{{ row.total | currency }}</td>
+                    <td>{{ row.funders }}</td>
+                    <td>{{ row.avg | currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {# Link to GrantNav #}
+        <p>
+            <a href="https://grantnav.threesixtygiving.org/org/GB-CHC-{{ grants.charity_number }}"
+               target="_blank" rel="noopener" class="link-pill">
+                View full grant history on GrantNav
+            </a>
+        </p>
+    </div>
+    {% else %}
+    <p class="panel-empty">No published grant data for this organisation on 360Giving. This is common — only a subset of UK funders publish to 360Giving.</p>
+    {% endif %}
+</article>

@@ -1,0 +1,105 @@
+{# Newsletter email template — rendered per subscriber with Jinja2 merge fields.
+   Shared content (headline, trend, watch) is the same for all subscribers.
+   Featured orgs and conditional blocks vary by subscriber cause_area and function. #}
+<div style="max-width:600px;margin:0 auto;font-family:system-ui,-apple-system,sans-serif;color:#1a1a1a">
+    <!-- Header -->
+    <div style="background:#1a237e;color:#fff;padding:16px 20px;border-radius:6px 6px 0 0">
+        <div style="font-size:18px;font-weight:700">Fern Talent</div>
+        <div style="font-size:13px;opacity:0.8">Sector Intelligence — {{ week_str }}</div>
+    </div>
+
+    <div style="padding:20px;background:#fff;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 6px 6px">
+
+        <!-- Greeting -->
+        {% if first_name %}
+        <p style="font-size:14px;margin:0 0 12px;color:#555">Hi {{ first_name }},</p>
+        {% endif %}
+
+        <!-- Headline -->
+        <p style="font-size:15px;line-height:1.5;margin:0 0 16px">{{ headline }}</p>
+
+        <!-- Alert: subscriber's org featured -->
+        {% if organisation and organisation in featured_org_names %}
+        <div style="background:#e3f2fd;border-left:3px solid #1a237e;padding:8px 12px;margin-bottom:16px;font-size:13px">
+            We've included intelligence on <strong>{{ organisation }}</strong> in this edition.
+        </div>
+        {% endif %}
+
+        <!-- Function-specific insight -->
+        {% if function == 'fundraising' and fundraising_insight %}
+        <div style="background:#f1f8e9;border-left:3px solid #558b2f;padding:8px 12px;margin-bottom:16px;font-size:13px">
+            <strong>For fundraising leaders:</strong> {{ fundraising_insight }}
+        </div>
+        {% elif function == 'hr_people' and hr_insight %}
+        <div style="background:#fce4ec;border-left:3px solid #c62828;padding:8px 12px;margin-bottom:16px;font-size:13px">
+            <strong>For people leaders:</strong> {{ hr_insight }}
+        </div>
+        {% elif function == 'finance' and finance_insight %}
+        <div style="background:#fff3e0;border-left:3px solid #e65100;padding:8px 12px;margin-bottom:16px;font-size:13px">
+            <strong>For finance leaders:</strong> {{ finance_insight }}
+        </div>
+        {% endif %}
+
+        <!-- Featured Organisations (cause-specific selection) -->
+        <h3 style="font-size:14px;color:#1a237e;margin:20px 0 10px;border-bottom:1px solid #e0e0e0;padding-bottom:4px">
+            {% if cause_area_label %}Featured in {{ cause_area_label }}{% else %}Featured Organisations{% endif %}
+        </h3>
+
+        {% for opp in featured_orgs %}
+        <div style="border-left:3px solid #1a237e;padding:8px 12px;margin-bottom:10px;background:#f8f9fa">
+            <div style="font-weight:600;font-size:14px">
+                {{ opp.org_name | smart_org }}
+                {% if opp.frame == 'bleeding_neck' %}
+                <span style="background:#c62828;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px">Distress</span>
+                {% elif opp.frame == 'fresh_wallet' %}
+                <span style="background:#2e7d32;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px">Growth</span>
+                {% endif %}
+            </div>
+            <div style="font-size:13px;color:#666">
+                Score: {{ '%.0f' | format(opp.score) }}
+                {% if opp.change and opp.change != 0 %}
+                <span style="color:{{ '#2e7d32' if opp.change > 0 else '#c62828' }};font-weight:bold">
+                    {{ '&#9650;' if opp.change > 0 else '&#9660;' }} {{ '%+.0f' | format(opp.change) }}
+                </span>
+                {% endif %}
+            </div>
+            {% if opp.pitch %}
+            <div style="font-size:13px;margin-top:4px">{{ opp.pitch }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {% if not featured_orgs %}
+        <p style="font-size:13px;color:#888">No featured organisations this week.</p>
+        {% endif %}
+
+        <!-- Cause-area specific trends -->
+        {% if cause_area and cause_area_trends %}
+        <h3 style="font-size:14px;color:#1a237e;margin:20px 0 10px;border-bottom:1px solid #e0e0e0;padding-bottom:4px">
+            In Your Sector
+        </h3>
+        <p style="font-size:13px;line-height:1.5;margin:0 0 12px">{{ cause_area_trends }}</p>
+        {% endif %}
+
+        <!-- Sector Trend -->
+        <h3 style="font-size:14px;color:#1a237e;margin:20px 0 10px;border-bottom:1px solid #e0e0e0;padding-bottom:4px">
+            Sector Pulse
+        </h3>
+        {{ trend_html | safe }}
+
+        <!-- One Thing To Watch -->
+        <h3 style="font-size:14px;color:#1a237e;margin:20px 0 10px;border-bottom:1px solid #e0e0e0;padding-bottom:4px">
+            One Thing To Watch
+        </h3>
+        <p style="font-size:13px;line-height:1.5;margin:0">{{ watch }}</p>
+
+        <!-- Footer -->
+        <div style="margin-top:24px;padding-top:12px;border-top:1px solid #e0e0e0;font-size:11px;color:#999">
+            <p>Fern Talent — Charity sector executive recruitment &amp; consultancy</p>
+            <p>
+                <a href="{{ unsub_url }}?email={{ email }}" style="color:#999">Unsubscribe</a>
+                &middot; <a href="https://www.ferntalent.com" style="color:#999">ferntalent.com</a>
+            </p>
+        </div>
+    </div>
+</div>

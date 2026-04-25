@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Agencies — NonprofitSage.ai{% endblock %}
+
+{% block content %}
+
+  <h1>Agency market intelligence</h1>
+  <p class="page-desc">How recruitment agencies compete in the charity sector — volume, specialisms, and salary data.</p>
+
+  <!-- Summary stats -->
+  {% set total_placements = agencies | sum(attribute='total_placements') %}
+  {% set total_live = agencies | sum(attribute='live_jobs') %}
+  <div class="stat-card-grid cols-3">
+    <div class="stat-card">
+      <div class="stat-card-number">{{ agencies | length }}</div>
+      <div class="stat-card-label">Agencies tracked</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-number steel">{{ total_placements }}</div>
+      <div class="stat-card-label">Total placements</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-number highlight">{{ total_live }}</div>
+      <div class="stat-card-label">Live agency jobs</div>
+    </div>
+  </div>
+
+  <!-- Tab nav -->
+  <div class="ag-tab-bar">
+    <button class="chart-tab active" onclick="showTab('trend')" id="tab-trend">Monthly activity</button>
+    <button class="chart-tab" onclick="showTab('roles')" id="tab-roles">Role seasonality</button>
+    <button class="chart-tab" onclick="showTab('salary')" id="tab-salary">Agency salary comparison</button>
+  </div>
+
+  <!-- Tab 1: Monthly trend -->
+  <div id="panel-trend" class="chart-panel">
+    <div class="ag-chart-card">
+      <h2>Monthly placements — 2024 vs 2025</h2>
+      <p class="ag-chart-subtitle">Bars show 2025 activity. Line shows 2024 for comparison. Top 8 agencies by volume.</p>
+      <canvas id="trendChart" height="110"></canvas>
+    </div>
+  </div>
+
+  <!-- Tab 2: Role seasonality -->
+  <div id="panel-roles" class="chart-panel ag-hidden">
+    <div class="ag-chart-card">
+      <h2>When do roles come to market?</h2>
+      <p class="ag-chart-subtitle">Placement volume by month and role family — helps anticipate hiring cycles.</p>
+      <canvas id="roleChart" height="110"></canvas>
+    </div>
+    <div class="ag-chart-card">
+      <h2>Role family breakdown</h2>
+      <div id="roleTable"></div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Salary comparison -->
+  <div id="panel-salary" class="chart-panel ag-hidden">
+    <div class="ag-chart-card">
+      <h2>Average salary by agency — top roles</h2>
+      <p class="ag-chart-subtitle">
+        Filter by role:
+        <select id="salaryRoleFilter" onchange="renderSalaryChart()" class="ag-role-select">
+          <option value="all">All roles</option>
+          <option value="ceo">CEO / Chief Executive</option>
+          <option value="fundraising">Fundraising</option>
+          <option value="finance">Finance</option>
+          <option value="comms">Comms / Marketing</option>
+          <option value="chair">Chair / Trustee</option>
+        </select>
+      </p>
+      <canvas id="salaryChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- League table -->
+  <details class="ag-league-details">
+    <summary class="ag-league-summary">
+      &#9660; Agency league table ({{ agencies|length }} agencies)
+    </summary>
+    <div class="ag-table-wrap">
+      <table class="ag-table">
+        <thead>
+          <tr>
+            <th class="ag-th-left">Agency</th>
+            <th class="ag-th-right">Placements</th>
+            <th class="ag-th-right">Live jobs</th>
+            <th class="ag-th-right">Avg salary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in agencies %}
+          <tr class="ag-row"
+              hx-get="/agencies/detail/{{ a.agency_name | urlencode }}"
+              hx-target="#agency-detail-{{ loop.index }}"
+              hx-swap="innerHTML"
+              onclick="this.querySelector('.expand-icon').textContent = this.querySelector('.expand-icon').textContent === '\u25b8' ? '\u25be' : '\u25b8'">
+            <td class="ag-td-agency">
+              <div class="ag-agency-cell">
+                <span class="expand-icon ag-expand">&#9656;</span>
+                {% if a.domain %}
+                <img src="https://www.google.com/s2/favicons?domain={{ a.domain }}&sz=64"
+                     onerror="this.style.display='none'"
+                     class="ag-favicon">
+                {% endif %}
+                <span class="ag-agency-name">{{ a.agency_name }}</span>
+                {% if a.jobs_url %}
+                <a href="{{ a.jobs_url }}" target="_blank" rel="noopener noreferrer"
+                   onclick="event.stopPropagation()"
+                   title="Browse {{ a.agency_name }} jobs page"
+                   class="ag-jobs-link">
+                   Jobs &#8599;
+                </a>
+                {% endif %}
+              </div>
+            </td>
+            <td class="ag-td-right ag-td-bold">{{ a.total_placements }}</td>
+            <td class="ag-td-right">
+              {% if a.live_jobs > 0 %}
+              <span class="ag-live-badge">{{ a.live_jobs }}</span>
+              {% else %}<span class="ag-muted">—</span>{% endif %}
+            </td>
+            <td class="ag-td-right ag-td-muted">
+              {% if a.avg_salary > 0 %}£{{ "{:,.0f}".format(a.avg_salary) }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr id="agency-detail-{{ loop.index }}" class="ag-detail-row">
+            <td colspan="4"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <!-- Live agency jobs -->
+  <h2 class="ag-live-heading">Live agency jobs</h2>
+  <div class="filter-row">
+    <span class="filter-label">Contract</span>
+    <button class="filter-pill active" onclick="filterAgencyJobs(this,'contract','')">Permanent</button>
+    <button class="filter-pill" onclick="filterAgencyJobs(this,'contract','interim')">Interim</button>
+    <button class="filter-pill" onclick="filterAgencyJobs(this,'contract','fixed_term')">Fixed term</button>
+    <button class="filter-pill" onclick="filterAgencyJobs(this,'contract','all')">All</button>
+  </div>
+  <div class="filter-row">
+    <span class="filter-label">Function</span>
+    <button class="filter-pill active" onclick="filterAgencyJobs(this,'function','fundraising')">Fundraising</button>
+    <button class="filter-pill" onclick="filterAgencyJobs(this,'function','leadership')">Leadership</button>
+    <button class="filter-pill" onclick="filterAgencyJobs(this,'function','all')">All</button>
+  </div>
+  <div class="filter-row ag-search-row">
+    <span class="filter-label">Search</span>
+    <input type="text" id="agency-title-search" placeholder="Search job titles...">
+    <input type="text" id="agency-org-search" placeholder="Search organisations...">
+    <button class="btn-primary ag-search-btn" onclick="filterAgencyJobs(this,'search','')">&#10140; Search</button>
+  </div>
+  {% if live_jobs %}
+  <div class="ag-job-list">
+    {% for item in live_jobs %}
+    {% include "components/job_card.html" %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="ag-empty-msg">No live agency jobs found.</p>
+  {% endif %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const raw = {{ trend | tojson }};
+const salaryRaw = {{ salary_by_agency | tojson }};
+const roleRaw = {{ role_seasonality | tojson }};
+
+const COLOURS = ['#FF4FBE','#5b7fc4','#0d1f2d','#00c48c','#f7a600','#e05c5c','#9b59b6','#1abc9c'];
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.chart-panel').forEach(p => p.classList.add('ag-hidden'));
+  document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.remove('ag-hidden');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'salary') renderSalaryChart();
+  if (name === 'roles') renderRoleChart();
+}
+
+// ── Trend chart: 2025 bars + 2024 line ───────────────────────────────────────
+(function() {
+  try {
+  // Get top 8 agencies
+  const totals = {};
+  raw.forEach(r => { totals[r.agency_name] = (totals[r.agency_name] || 0) + r.placements; });
+  const top8 = Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,8).map(e=>e[0]);
+
+  // All months in order Jan-Dec
+  const months2025 = Array.from({length:12},(_,i)=>`2025-${String(i+1).padStart(2,'0')}`);
+  const months2024 = Array.from({length:12},(_,i)=>`2024-${String(i+1).padStart(2,'0')}`);
+  const labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const lookup = (agency, months) => months.map(m => {
+    const f = raw.find(r => r.agency_name === agency && r.month === m);
+    return f ? f.placements : 0;
+  });
+
+  // 2025 stacked bars per agency
+  const barDatasets = top8.map((agency, i) => ({
+    type: 'bar',
+    label: agency + ' (2025)',
+    data: lookup(agency, months2025),
+    backgroundColor: COLOURS[i % COLOURS.length],
+    stack: '2025',
+    borderRadius: 2,
+  }));
+
+  new Chart(document.getElementById('trendChart'), {
+    data: { labels, datasets: barDatasets },
+    options: {
+      plugins: { legend: { position:'bottom', labels:{ font:{size:10}, boxWidth:12 } } },
+      responsive: true,
+      scales: {
+        x: { stacked:true, ticks:{ font:{size:11} } },
+        y: { stacked:true, beginAtZero:true, max:20, ticks:{ font:{size:11} }, title:{ display:true, text:'Placements' } }
+      }
+    }
+  });
+  } catch (e) { console.error('trend chart init failed:', e); }
+})();
+
+// ── Role seasonality chart ────────────────────────────────────────────────────
+let roleChartInstance = null;
+function renderRoleChart() {
+  try {
+  const labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const families = [...new Set(roleRaw.map(r=>r.role_family))].filter(Boolean);
+
+  const datasets = families.map((fam, i) => ({
+    label: fam,
+    data: Array.from({length:12},(_,mi) => {
+      const month = String(mi+1).padStart(2,'0');
+      const found = roleRaw.filter(r => r.role_family===fam && r.month===month);
+      return found.reduce((s,r)=>s+r.n,0);
+    }),
+    backgroundColor: COLOURS[i % COLOURS.length],
+    borderRadius: 2,
+  }));
+
+  if (roleChartInstance) roleChartInstance.destroy();
+  roleChartInstance = new Chart(document.getElementById('roleChart'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      plugins: { legend:{ position:'bottom', labels:{ font:{size:10}, boxWidth:12 } } },
+      responsive: true,
+      scales: {
+        x: { stacked:true, ticks:{ font:{size:11} } },
+        y: { stacked:true, beginAtZero:true, ticks:{ font:{size:11} } }
+      }
+    }
+  });
+
+  // Role family table
+  const totals = {};
+  roleRaw.forEach(r => { totals[r.role_family] = (totals[r.role_family]||0) + r.n; });
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('roleTable').innerHTML = `
+    <table class="ag-table ag-role-table">
+      <thead><tr>
+        <th class="ag-th-left">Role family</th>
+        <th class="ag-th-right">Total placements</th>
+        <th class="ag-th-left">Peak month</th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(([fam,n]) => {
+          const byMonth = Array.from({length:12},(_,mi)=>{
+            const m = String(mi+1).padStart(2,'0');
+            return roleRaw.filter(r=>r.role_family===fam&&r.month===m).reduce((s,r)=>s+r.n,0);
+          });
+          const peakIdx = byMonth.indexOf(Math.max(...byMonth));
+          const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          return `<tr class="ag-row-light">
+            <td class="ag-td-left">${fam}</td>
+            <td class="ag-td-right ag-td-bold">${n}</td>
+            <td class="ag-td-left ag-td-muted">${monthNames[peakIdx]}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  } catch (e) { console.error('role chart init failed:', e); }
+}
+// renderRoleChart() called on tab click, not on load — canvas in hidden panel
+// has clientWidth:0 which makes Chart.js throw and breaks the rest of the page.
+
+// ── Salary comparison chart ───────────────────────────────────────────────────
+let salaryChartInstance = null;
+function renderSalaryChart() {
+  try {
+  const filter = document.getElementById('salaryRoleFilter').value;
+  let data = salaryRaw;
+  if (filter !== 'all') {
+    data = salaryRaw.filter(r => r.role_filter === filter);
+  }
+  // Group by agency
+  const byAgency = {};
+  data.forEach(r => {
+    if (!byAgency[r.agency_name]) byAgency[r.agency_name] = [];
+    byAgency[r.agency_name].push(r.avg_salary);
+  });
+  const agencies = Object.keys(byAgency).filter(a => byAgency[a].length > 0);
+  const avgs = agencies.map(a => Math.round(byAgency[a].reduce((s,v)=>s+v,0)/byAgency[a].length));
+  // Sort by avg salary desc
+  const sorted = agencies.map((a,i)=>({a,v:avgs[i]})).sort((x,y)=>y.v-x.v);
+
+  if (salaryChartInstance) salaryChartInstance.destroy();
+  salaryChartInstance = new Chart(document.getElementById('salaryChart'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(s=>s.a),
+      datasets: [{
+        label: 'Avg salary (\u00a3)',
+        data: sorted.map(s=>s.v),
+        backgroundColor: sorted.map((_,i)=>COLOURS[i%COLOURS.length]),
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend:{ display:false } },
+      responsive: true,
+      scales: {
+        x: { beginAtZero:true, ticks:{ callback: v=>'\u00a3'+v.toLocaleString(), font:{size:10} } },
+        y: { ticks:{ font:{size:11} } }
+      }
+    }
+  });
+  } catch (e) { console.error('salary chart init failed:', e); }
+}
+// renderSalaryChart() called on tab click, not on load
+</script>
+{% endblock %}

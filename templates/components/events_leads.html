@@ -1,0 +1,149 @@
+<style>
+  .el-form { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:1rem 1.1rem 1.1rem; margin-bottom:1.25rem; }
+  .el-form h3 { margin:0 0 0.75rem; font-size:0.95rem; color:var(--navy); font-weight:800; }
+  .el-form label { display:block; font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); margin:0.6rem 0 0.25rem; }
+  .el-form input[type=text], .el-form input[type=number], .el-form select, .el-form textarea {
+    width:100%; box-sizing:border-box; padding:0.4rem 0.55rem; border:1.2px solid #e2e8f0;
+    border-radius:6px; font-family:'Open Sans',sans-serif; font-size:0.82rem;
+  }
+  .el-form textarea { resize:vertical; min-height:4em; }
+  .el-row { display:grid; grid-template-columns:1fr 1fr; gap:0.8rem; }
+  .el-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.8rem; }
+  .el-reminders { display:flex; gap:1rem; margin-top:0.4rem; flex-wrap:wrap; }
+  .el-reminders label { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.8rem; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-secondary); margin:0; }
+  .el-submit { margin-top:0.9rem; background:var(--navy); color:#fff; border:none; border-radius:6px; padding:0.5rem 1.3rem; font-size:0.82rem; font-weight:700; cursor:pointer; font-family:'Open Sans',sans-serif; }
+  .el-submit:hover { background:#1a3347; }
+
+  .el-org-picker { position:relative; }
+  .el-org-results { position:absolute; left:0; right:0; top:100%; z-index:10; box-shadow:0 4px 12px rgba(0,0,0,0.08); }
+  .el-search-hit:hover { background:#fff0f9; }
+
+  .el-reminder-list { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem 0.9rem 0.2rem; }
+  .el-reminder-list h3 { margin:0 0 0.5rem; font-size:0.9rem; color:var(--navy); font-weight:800; }
+  .el-reminder { display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid #f1f5f9; }
+  .el-reminder:last-child { border-bottom:none; }
+  .el-rem-info .el-rem-org { font-weight:700; font-size:0.85rem; color:var(--navy); }
+  .el-rem-info .el-rem-detail { font-size:0.74rem; color:var(--text-muted); margin-top:0.12rem; }
+  .el-rem-date { font-size:0.78rem; color:#5b7fc4; font-weight:700; }
+  .el-rem-done { font-size:0.7rem; color:var(--text-muted); background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; padding:0.18rem 0.4rem; cursor:pointer; font-family:'Open Sans',sans-serif; }
+  .el-rem-done:hover { background:#e2e8f0; }
+
+  .el-empty { padding:1rem; text-align:center; font-size:0.82rem; color:var(--text-muted); }
+</style>
+
+<form class="el-form" method="post" action="/events/leads/add">
+  <h3>Add a prospecting event</h3>
+  <p style="font-size:0.78rem;color:var(--text-muted);margin:-0.4rem 0 0.4rem;">
+    Record an event you've heard about or want to track. It will appear on the Event Cards tab alongside the data-driven events.
+  </p>
+
+  <label>Organisation</label>
+  <div class="el-org-picker">
+    <input type="text" id="el-org-search" placeholder="Start typing an org name..." autocomplete="off"
+           hx-get="/events/search-org" hx-trigger="keyup changed delay:220ms"
+           hx-target="#el-org-results" hx-include="this" name="q">
+    <div id="el-org-results" class="el-org-results"></div>
+  </div>
+  <input type="hidden" name="org_id" id="el-org-id" value="">
+  <input type="hidden" name="org_name" id="el-org-name" value="">
+  <div id="el-org-selected" style="font-size:0.78rem;color:var(--navy);margin-top:0.25rem;"></div>
+
+  <div class="el-row">
+    <div>
+      <label>Event type</label>
+      <select name="event_type">
+        {% for val, lab in event_types %}
+        <option value="{{ val }}">{{ lab }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Event name</label>
+      <input type="text" name="event_name" placeholder="e.g. Winter Gala">
+    </div>
+  </div>
+
+  <div class="el-row-3">
+    <div>
+      <label>Expected attendees</label>
+      <input type="number" name="size_attendees" min="0" placeholder="e.g. 200">
+    </div>
+    <div>
+      <label>Format</label>
+      <select name="format">
+        <option value="">—</option>
+        {% for val, lab in event_formats %}
+        <option value="{{ val }}">{{ lab }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Years running</label>
+      <input type="number" name="years_running" min="0" placeholder="e.g. 5">
+    </div>
+  </div>
+
+  <div class="el-row">
+    <div>
+      <label>Start month</label>
+      <select name="start_month">
+        <option value="">—</option>
+        {% for m in range(1, 13) %}
+        <option value="{{ m }}">{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Start year</label>
+      <input type="number" name="start_year" min="2020" max="2035" placeholder="e.g. 2026">
+    </div>
+  </div>
+
+  <label>Notes</label>
+  <textarea name="notes" placeholder="Anything you want to remember about this event — venue, amount raised in prior years, key contacts, etc."></textarea>
+
+  <label>Set follow-up reminders</label>
+  <div class="el-reminders">
+    <label><input type="checkbox" name="remind_6m" value="1"> In 6 months</label>
+    <label><input type="checkbox" name="remind_12m" value="1"> In 12 months</label>
+    <label><input type="checkbox" name="remind_18m" value="1"> In 18 months</label>
+  </div>
+
+  <button type="submit" class="el-submit">Add event</button>
+</form>
+
+<div class="el-reminder-list">
+  <h3>Your upcoming reminders (next 30 days)</h3>
+  {% if reminders %}
+    {% for r in reminders %}
+    <div class="el-reminder" id="reminder-{{ r.reminder_id }}">
+      <div class="el-rem-info">
+        <div class="el-rem-org">{{ r.org_name or 'Unknown org' }}</div>
+        <div class="el-rem-detail">
+          {{ r.event_name or (r.event_type | replace('_',' ') | title) }}
+          {% if r.start_year %} · {{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(r.start_month or 1)-1] }} {{ r.start_year }}{% endif %}
+          {% if r.size_attendees %} · {{ r.size_attendees }} attendees{% endif %}
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.6rem;">
+        <span class="el-rem-date">Contact by {{ r.remind_at }}</span>
+        <button class="el-rem-done"
+                hx-post="/events/reminders/{{ r.reminder_id }}/done"
+                hx-target="#reminder-{{ r.reminder_id }}" hx-swap="outerHTML">Done</button>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="el-empty">No upcoming reminders. Add an event above and tick a follow-up checkbox to schedule one.</div>
+  {% endif %}
+</div>
+
+<script>
+window.selectOrg = function(id, name) {
+  document.getElementById('el-org-id').value = id;
+  document.getElementById('el-org-name').value = name;
+  document.getElementById('el-org-search').value = name;
+  document.getElementById('el-org-selected').textContent = 'Selected: ' + name;
+  document.getElementById('el-org-results').innerHTML = '';
+};
+</script>

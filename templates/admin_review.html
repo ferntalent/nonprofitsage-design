@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Review — NonprofitSage.ai{% endblock %}
+{% block main_class %}container-full{% endblock %}
+{% block content %}
+
+{# Per the UX review's "Celebrate progress": every 10 reviewed items
+   pop a positive toast so the curation work doesn't feel thankless.
+   Counter lives in sessionStorage so it resets on tab close — we want
+   to celebrate a focused batch, not a lifetime cumulative number. #}
+<script>
+(function() {
+  document.body.addEventListener('reviewDecisionMade', function() {
+    var n = parseInt(sessionStorage.getItem('rvw_streak') || '0', 10) + 1;
+    sessionStorage.setItem('rvw_streak', String(n));
+    if (n % 10 === 0 && typeof showToast === 'function') {
+      showToast('+' + n + ' corrections this session — ranking model updated', 'success');
+    }
+  });
+})();
+</script>
+
+
+<div class="master-detail">
+
+  {# -- LEFT PANEL: stats + filters + card list -- #}
+  <div class="master-list">
+    <div class="master-list-inner">
+
+      {# Stats cards — auto-refresh on HX-Trigger "reviewDecisionMade". #}
+      <div class="stat-card-grid" id="review-stats"
+           hx-get="/admin/review/fragment/stats"
+           hx-trigger="reviewDecisionMade from:body"
+           hx-swap="innerHTML">
+        {% include "components/review_stats_cards.html" %}
+      </div>
+
+      <p class="page-desc">Jobs and data flagged for manual checking before they appear in the main list.</p>
+
+      {# Filter pills — auto-refresh, preserves current category + sort. #}
+      <div class="filter-row" id="review-filters"
+           hx-get="/admin/review/fragment/filters?category={{ current_category }}&sort={{ current_sort }}"
+           hx-trigger="reviewDecisionMade from:body"
+           hx-swap="innerHTML">
+        {% include "components/review_filter_pills.html" %}
+      </div>
+
+      {# Sort pills (no counts, no auto-refresh needed) #}
+      <div class="filter-row" id="review-sort">
+        <span class="filter-label">Sort</span>
+        <a href="/admin/review?category={{ current_category }}&sort=newest"
+           class="filter-pill {{ 'active' if current_sort == 'newest' }}">Newest</a>
+        <a href="/admin/review?category={{ current_category }}&sort=oldest"
+           class="filter-pill {{ 'active' if current_sort == 'oldest' }}">Oldest</a>
+      </div>
+
+      <p class="result-count" id="review-result-count"
+         hx-get="/admin/review/fragment/count?category={{ current_category }}"
+         hx-trigger="reviewDecisionMade from:body"
+         hx-swap="innerHTML">
+        Showing <strong>{{ items|length }}</strong> items
+      </p>
+
+      {# Learned-patterns panel — read-only view of relevance_weights.json. #}
+      <div id="review-learned"
+           hx-get="/admin/review/fragment/learned"
+           hx-trigger="load"
+           hx-swap="innerHTML"></div>
+
+      {# Scrollable card list #}
+      <div id="admin-review-list">
+      {% if items %}
+        {% for item in items %}
+          {% include "components/admin_review_card.html" %}
+        {% endfor %}
+      {% else %}
+        <div class="detail-empty">
+          <span>Nothing to review</span>
+          <span class="review-hint">New items will appear after the next nightly rebuild.</span>
+        </div>
+      {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  {# -- RIGHT PANEL: detail view --
+       Auto-clears to the empty state on HX-Trigger "reviewDecisionMade"
+       so the user sees "pick next item" immediately after a decision. #}
+  <div class="master-detail-content" id="review-detail-panel"
+       hx-get="/admin/review/fragment/detail-empty"
+       hx-trigger="reviewDecisionMade from:body"
+       hx-swap="innerHTML">
+    <div class="detail-empty">
+      <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      <span>Select an item from the list to review</span>
+      <span class="review-hint">Use arrow keys to navigate</span>
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* Review page — local overrides */
+#review-stats { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); margin-bottom: 12px; }
+.review-hint { font-size: 0.8rem; color: var(--text-muted); }
+.ar-card { cursor: pointer; }
+.ar-card.selected { border-left: 3px solid var(--pink) !important; background: var(--pink-soft); }
+
+/* Learned-patterns panel */
+.learned-panel { margin: 16px 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.learned-header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.learned-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
+.learned-meta { font-size: 11px; color: var(--text-muted); }
+.learned-empty, .learned-empty-inline { font-size: 12px; color: var(--text-muted); }
+.learned-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.learned-col-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+.learned-col-head-boost { color: var(--green); }
+.learned-col-head-suppress { color: var(--amber); }
+.learned-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.learned-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.learned-chip-boost { background: var(--green-soft); color: var(--green); }
+.learned-chip-suppress { background: var(--amber-soft); color: var(--amber); }
+.learned-footnote { margin-top: 10px; font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+</style>
+
+<script>
+(function() {
+    /* Card selection — click to load detail */
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest('.ar-card');
+        if (!card) return;
+        if (e.target.closest('a, button, input, select, textarea')) return;
+        document.querySelectorAll('.ar-card.selected').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+    });
+
+    /* Keyboard navigation */
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        var cards = Array.from(document.querySelectorAll('#admin-review-list .ar-card'));
+        if (!cards.length) return;
+        var selected = document.querySelector('.ar-card.selected');
+        var idx = selected ? cards.indexOf(selected) : -1;
+
+        if (e.key === 'ArrowDown' || e.key === 'j') {
+            e.preventDefault();
+            idx = Math.min(idx + 1, cards.length - 1);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp' || e.key === 'k') {
+            e.preventDefault();
+            idx = Math.max(idx - 1, 0);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        }
+    });
+
+    /* Auto-select first card after HTMX initialises */
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            var first = document.querySelector('.ar-card');
+            if (first) { first.click(); }
+        }, 150);
+    });
+})();
+</script>
+
+{% endblock %}

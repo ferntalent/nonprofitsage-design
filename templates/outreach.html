@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Outreach — NonprofitSage{% endblock %}
+{% block content %}
+
+<div class="stats-bar" role="group">
+    <span class="stat"><strong>{{ pending_count }}</strong> pending drafts</span>
+    <span class="stat"><strong>{{ sent_today }}</strong> sent today</span>
+    {% if cooldown_active %}
+    <span class="stat" style="color:#f59e0b;">Cooldown: {{ cooldown_remaining }}s</span>
+    {% endif %}
+</div>
+
+<div id="outreach-list">
+{% if drafts %}
+    {% for draft in drafts %}
+        {% include "components/outreach_card.html" %}
+    {% endfor %}
+{% else %}
+    <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+        <p style="font-size:1.1rem;">No drafts pending</p>
+        <p style="font-size:0.85rem;">Run <code>generate_outreach.py</code> to create new drafts from sourced contacts.</p>
+    </div>
+{% endif %}
+</div>
+
+{% endblock %}

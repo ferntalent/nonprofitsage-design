@@ -1,0 +1,333 @@
+{# Job detail panel — loaded via HTMX into #job-detail-panel #}
+{% set raw_org = item.get('org_name', '') or 'Unknown' %}
+{% set raw_title = item.get('job_title', '') or 'Untitled role' %}
+{% set org_id = item.get('org_id', '') %}
+{% set charity_number_ew = item.get('charity_number_ew', '') %}
+{% set salary_low = item.get('salary_low', '') %}
+{% set salary_high = item.get('salary_high', '') %}
+{% set salary_period = item.get('salary_period', '') or '' %}
+{% set contract = item.get('contract_type', '') %}
+{% set source_type = item.get('source_type', '') %}
+{% set readvert = item.get('readvertise_count', 0)|int %}
+{% set posted = item.get('posted_date', '') %}
+{% set closing = item.get('closing_date', '') %}
+{% set score = item.get('total_score') %}
+{% set intel_bucket = item.get('intel_bucket', '') %}
+{% set intel_pct = item.get('intel_percentile', 0) %}
+{% set job_url = item.get('job_url', '') %}
+{% set cause = item.get('cause_area', '') %}
+{% set income_band = item.get('income_band', '') %}
+{% set region = item.get('address_region', '') %}
+{% set job_func = item.get('job_function', '') %}
+{% set is_agency = item.get('is_known_agency_org') %}
+{% set website = item.get('website', '') %}
+{% set postcode = item.get('address_postcode', '') %}
+{% set hours = item.get('hours', '') %}
+{% set work_pattern = item.get('work_pattern', '') %}
+{% set location = item.get('location', '') %}
+{% set org_name = raw_org | smart_org %}
+{% set title = raw_title | smart_title %}
+{% set job_id = item.get('job_id', '') %}
+
+{# Score band #}
+{% set _score_val = score|float if score else 0 %}
+{% if _score_val >= 25 %}
+  {% set score_pill_cls = "score-pill-hot" %}{% set score_band = "Hot" %}
+{% elif _score_val >= 15 %}
+  {% set score_pill_cls = "score-pill-warm" %}{% set score_band = "Warm" %}
+{% elif _score_val > 0 %}
+  {% set score_pill_cls = "score-pill-monitoring" %}{% set score_band = "Monitoring" %}
+{% else %}
+  {% set score_pill_cls = "" %}{% set score_band = "" %}
+{% endif %}
+
+<div class="detail-card">
+
+  {# ── ORG HEADER + SCORE ── #}
+  <div class="jd-org-header">
+    {% if website %}
+    <img src="https://www.google.com/s2/favicons?domain={{ website|replace('https://','')|replace('http://','') }}&sz=64"
+         alt="" class="ds-icon-tile"
+         onerror="this.outerHTML='<div class=\'ds-icon-tile\'>{{ org_name[:1] }}</div>'">
+    {% else %}
+    <div class="ds-icon-tile">{{ org_name[:1] }}</div>
+    {% endif %}
+    <div class="jd-org-body">
+      <div class="jd-org-name">
+        {% if org_id %}<a href="/org/{{ org_id }}">{{ org_name | smart_org }}</a>{% else %}{{ org_name | smart_org }}{% endif %}
+      </div>
+      {% if cause or income_band or region %}
+      <div class="jd-org-meta">
+        {% if cause %}{{ cause }}{% endif %}{% if income_band %} · {{ income_band }}{% endif %}{% if region %} · {{ region }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% if _score_val > 0 %}
+    <div class="jd-score-right">
+      <div class="score-display">
+        <span class="score-display-number">{{ _score_val|round(1) }}</span>
+        <span class="score-pill {{ score_pill_cls }}">{{ score_band }}</span>
+      </div>
+      {% if intel_pct %}
+      <div class="score-display-explain">Top {{ intel_pct }}% of tracked organisations</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── WHY THIS SCORE? — top scoring triggers for this org ── #}
+  {% if top_triggers %}
+  <div class="jd-trigger-panel">
+    <div class="jd-trigger-label">Why this score?</div>
+    <div class="jd-trigger-list">
+      {% for t in top_triggers %}
+      <div class="jd-trigger-row"{% if t.evidence %} title="{{ t.evidence }}"{% endif %}>
+        <div class="jd-trigger-head">
+          <span class="jd-trigger-name">{{ t.label }}</span>
+          <span class="jd-trigger-pts">{% if t.days_ago is not none %}{% if t.days_ago == 0 %}today{% elif t.days_ago == 1 %}yesterday{% else %}{{ t.days_ago }}d ago{% endif %}{% endif %}</span>
+        </div>
+        {% if t.blurb %}<div class="jd-trigger-blurb">{{ t.blurb }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── SCORE BREAKDOWN (Financial / Workforce / Digital / Governance / Delivery) ── #}
+  {% include "components/score_breakdown.html" ignore missing %}
+
+  {# ── JOB TITLE ── #}
+  <div class="ds-label">Role</div>
+  <div class="jd-title">
+    {% if job_url %}<a href="{{ job_url }}" target="_blank" rel="noopener">{{ title }}</a>{% else %}{{ title }}{% endif %}
+    {% if job_func %}<span class="badge badge-monitor jd-title-badge">{{ job_func }}</span>{% endif %}
+  </div>
+
+  {# ── SALARY ── #}
+  {% set _sal_low = salary_low|float if salary_low and salary_low|string not in ('','nan','None') else 0 %}
+  {% set _sal_high = salary_high|float if salary_high and salary_high|string not in ('','nan','None') else 0 %}
+  {% if salary_period == 'daily' and (_sal_low > 0 or _sal_high > 0) %}
+  {% set _day_low = _sal_low|int %}
+  {% set _day_high = _sal_high|int %}
+  <div class="jd-salary">
+    {% if _day_high > _day_low %}
+    &pound;{{ _day_low }} – &pound;{{ _day_high }}/day
+    {% else %}
+    &pound;{{ _day_low }}/day
+    {% endif %}
+    <span class="jd-salary-suffix">
+      (~&pound;{{ '{:,}'.format(((_day_high if _day_high > _day_low else _day_low) * 220)|round(-3)|int) }} annual equiv)
+    </span>
+  </div>
+  {% elif _sal_low > 1000 %}
+  <div class="jd-salary">
+    {% if _sal_high > _sal_low %}
+    &pound;{{ '{:,}'.format(_sal_low|int) }} – &pound;{{ '{:,}'.format(_sal_high|int) }}
+    {% else %}
+    &pound;{{ '{:,}'.format(_sal_low|int) }}
+    {% endif %}
+    {% set bench = item.get('salary_vs_benchmark') %}
+    {% set bench_sal = item.get('benchmark_salary') %}
+    {% if bench is not none and bench_sal %}
+      {% if bench >= 5 %}
+        <span class="jd-bench jd-bench-above">+{{ bench|round(0)|int }}% above average</span>
+      {% elif bench <= -5 %}
+        <span class="jd-bench jd-bench-below">{{ bench|round(0)|int }}% below average</span>
+      {% else %}
+        <span class="jd-bench jd-bench-inline">In line with average</span>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="jd-salary-na">Salary not stated</div>
+  {% endif %}
+
+  {# ── METADATA TAGS ── #}
+  <div class="jd-badge-row">
+    {% if contract and contract != 'unknown' %}
+      {% if contract == 'maternity_cover' %}<span class="badge badge-interim">Maternity cover</span>
+      {% elif contract == 'interim' %}<span class="badge badge-interim">Interim</span>
+      {% elif contract == 'fixed_term' %}<span class="badge badge-fixed">Fixed term</span>
+      {% else %}<span class="badge badge-perm">Permanent</span>{% endif %}
+    {% endif %}
+    {% if hours %}<span class="badge badge-monitor">{{ hours|replace("_"," ")|title }}</span>{% endif %}
+    {% if work_pattern %}<span class="badge badge-monitor">{{ work_pattern|replace("_"," ")|title }}</span>{% endif %}
+    {% if location or postcode %}<span class="badge badge-monitor">{{ location or postcode }}</span>{% endif %}
+    {% if source_type == 'direct' %}<span class="badge badge-new">Direct listing</span>
+    {% elif source_type == 'agency' %}<span class="badge jd-badge-agency">Via agency</span>
+    {% else %}<span class="badge badge-monitor">Advert</span>{% endif %}
+    {% if readvert > 0 %}<span class="badge badge-hot">↻ Re-listed{% if readvert > 1 %} ×{{ readvert }}{% endif %}</span>{% endif %}
+    {% if is_agency and not org_id %}<span class="badge jd-badge-agency">Agency job</span>{% endif %}
+  </div>
+
+  {# ── DATES ── #}
+  <div class="jd-dates">
+    {% if posted %}Posted {{ posted }}{% endif %}
+    {% if closing %} · Closes {{ closing }}{% endif %}
+  </div>
+
+  {# ── ACTIONS ──
+     Claim = assign ownership (marks who's working the org so you don't
+     double up). Shortlist = save the role to a separate "Shortlist" tab
+     for outreach later. Both write to SQLite and, on success, fire a
+     `jobTriaged` HX-Trigger that jobs.html uses to clear the detail
+     panel and append the next-best card at the bottom of the list. #}
+  <div class="ds-label">Actions</div>
+  <div class="jd-actions-row">
+    {% if item.get('claimed_by') %}
+      <span class="badge-claimed">Claimed by {{ item.get('claimed_by') }}</span>
+    {% else %}
+      <details class="jc-dropdown">
+        <summary class="jd-claim-btn" title="Mark this job as being worked by Tim or Rory so you don't double up on outreach.">✓ Claim</summary>
+        <ul>
+          <li><button type="button" hx-post="/jobs/claim?job_id={{ job_id }}&owner=Tim" hx-target="[id='job-{{ job_id }}']" hx-swap="outerHTML" hx-on::after-request="this.closest('details').open=false">Assign to Tim</button></li>
+          <li><button type="button" hx-post="/jobs/claim?job_id={{ job_id }}&owner=Rory" hx-target="[id='job-{{ job_id }}']" hx-swap="outerHTML" hx-on::after-request="this.closest('details').open=false">Assign to Rory</button></li>
+        </ul>
+      </details>
+    {% endif %}
+
+    {% if charity_number_ew and charity_number_ew|string|trim not in ("", "nan", "None") %}
+      {% if not item.get('shortlisted_by') %}
+      <details class="jc-dropdown">
+        <summary class="jd-shortlist-btn" title="Save this job to the Shortlist tab for follow-up.">+ Shortlist</summary>
+        <ul>
+          <li><button type="button" hx-post="/jobs/shortlist?job_id={{ job_id }}&owner=Tim" hx-target="[id='job-{{ job_id }}']" hx-swap="outerHTML" hx-on::after-request="this.closest('details').open=false">Shortlist for Tim</button></li>
+          <li><button type="button" hx-post="/jobs/shortlist?job_id={{ job_id }}&owner=Rory" hx-target="[id='job-{{ job_id }}']" hx-swap="outerHTML" hx-on::after-request="this.closest('details').open=false">Shortlist for Rory</button></li>
+        </ul>
+      </details>
+      {% else %}
+      <span class="jd-shortlisted">★ Shortlisted by {{ item.get('shortlisted_by') }}</span>
+      {% endif %}
+    {% endif %}
+
+    <button class="jd-skip-btn"
+            hx-post="/jobs/dismiss?job_id={{ job_id }}&reason=false_positive"
+            hx-target="[id='job-{{ job_id }}']"
+            hx-swap="outerHTML"
+            title="Hide this job from future lists">✕ False positive</button>
+
+    {% if is_agency %}
+    <button class="btn-guess"
+            hx-post="/jobs/guess-charity"
+            hx-vals='{"job_title":"{{ title|e }}","org_name":"{{ org_name|e }}","job_url":"{{ job_url|e }}","postcode":"{{ postcode|e }}","location":"{{ location|e }}","cause":"{{ cause|e }}"}'
+            hx-target="#guess-result"
+            hx-swap="innerHTML">Guess charity</button>
+    {% endif %}
+  </div>
+  <div id="guess-result"></div>
+
+  {# ── KEY CONTACTS ── top-ranked contacts by seniority (CEO / Head of Fundraising first). #}
+  {% if contacts %}
+  <div class="ds-label">Key contacts</div>
+  <div class="jd-contacts-list">
+    {% for c in contacts %}
+    {% set _cname = (c.get('name', '') or '').strip() %}
+    {% set _crole = c.get('role_title', '') or '' %}
+    {% set _cli = c.get('linkedin_url', '') or '' %}
+    {% set _cemail = c.get('email', '') or '' %}
+    <div class="jd-contact-row">
+      <div class="jd-contact-avatar">{{ _cname[:1]|upper or '?' }}</div>
+      <div class="jd-contact-info">
+        <div class="jd-contact-name">{{ _cname or '—' }}</div>
+        {% if _crole %}<div class="jd-contact-role">{{ _crole }}</div>{% endif %}
+      </div>
+      {% if _cli %}<a href="{{ _cli }}" target="_blank" rel="noopener" class="link-pill jd-contact-link">LinkedIn</a>{% endif %}
+      {% if _cemail %}<a href="mailto:{{ _cemail }}" class="link-pill jd-contact-link">Email</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% if org_id %}
+    <a href="/org/{{ org_id }}#contacts" class="jd-see-all">See all contacts →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── INTEL INSIGHT ── #}
+  {% set fundraising = item.get('fundraising_strategy', '') %}
+  {% set hiring_intent = item.get('hiring_intent', '') %}
+  {% if fundraising or hiring_intent %}
+  <div class="ds-label">Intelligence from annual report</div>
+  <div class="insight-box">
+    {% if hiring_intent %}<div class="jd-insight-row"><strong>Hiring signals:</strong> {{ hiring_intent }}</div>{% endif %}
+    {% if fundraising %}<div class="jd-insight-row"><strong>Fundraising strategy:</strong> {{ fundraising }}</div>{% endif %}
+  </div>
+  {% endif %}
+
+  {# ── WARM PATH ── #}
+  {% set warm_count = item.get('warm_path_count', 0)|int %}
+  {% set warm_contact = item.get('warm_path_contact', '') %}
+  {% if warm_contact or warm_count > 0 %}
+  <div class="ds-label">Known connections</div>
+  <div class="jd-warm-banner">
+    ★ {% if warm_contact %}You know <strong>{{ warm_contact }}</strong>{% endif %}
+    {% if warm_count > 1 %} + {{ warm_count - 1 }} more connection{{ 's' if warm_count > 2 }}{% endif %}
+  </div>
+  {% endif %}
+
+  {# ── QUICK LINKS ── #}
+  <div class="ds-label">Quick links</div>
+  <div class="link-row">
+    {% if org_id %}<a href="/org/{{ org_id }}" target="_blank" rel="noopener" class="link-pill">Report</a>{% endif %}
+    {% if job_url %}<a href="{{ job_url }}" target="_blank" rel="noopener" class="link-pill">Listing</a>{% endif %}
+    {% if charity_number_ew and charity_number_ew|string|trim not in ("", "nan", "None") %}
+    <a href="https://register-of-charities.charitycommission.gov.uk/charity-details/?regId={{ charity_number_ew|string|trim|replace('.0','') }}"
+       target="_blank" rel="noopener" class="link-pill">Register</a>
+    <a href="https://fern-talent.app.loxo.co/agencies/40830/companies?query={{ org_name|urlencode }}" target="_blank" rel="noopener" class="link-pill">Loxo</a>
+    {% endif %}
+    {% if website %}
+    <a href="{{ website }}" target="_blank" rel="noopener" class="link-pill">Website</a>
+    {% endif %}
+  </div>
+
+  {# ── AI EMAIL STUB ── #}
+  <div class="ai-email-stub ds-mt-4">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+    <p>AI-powered email composer coming soon</p>
+    <button class="filter-pill jd-email-stub-disabled" disabled>Draft email with AI</button>
+  </div>
+
+  {# ── EDIT PANEL ──
+     Re-attribution: sometimes a listing is posted under a subsidiary
+     name (e.g. "Dogs Trust Legacy") when the hiring charity is actually
+     the parent ("Dogs Trust"). Paste the real charity number from the
+     Charity Commission register to fix the attribution — the backend
+     resolves it to the matching org_id + org_name from org_master. #}
+  <details class="jd-edit-wrap">
+    <summary class="jd-edit-summary">Edit job details</summary>
+    <div class="jd-edit-body">
+      <form hx-post="/jobs/override" hx-target="this" hx-swap="innerHTML">
+        <input type="hidden" name="job_id" value="{{ job_id }}">
+        <div class="jc-edit-grid">
+          <div><label>Job title</label><input type="text" name="corrected_job_title" placeholder="{{ title }}"></div>
+          <div><label>Org name</label><input type="text" name="corrected_org_name" placeholder="{{ org_name }}"></div>
+          <div>
+            <label>Charity number</label>
+            <input type="text" name="corrected_charity_number_ew" placeholder="{{ charity_number_ew or 'e.g. 227523' }}">
+          </div>
+          <div><label>Salary</label><input type="text" name="corrected_salary" placeholder="{{ salary_low }}"></div>
+          <div><label>Location</label><input type="text" name="corrected_location" placeholder="{{ postcode }}"></div>
+          <div>
+            <label>Contract</label>
+            <select name="corrected_contract">
+              <option value="">No change</option>
+              <option value="permanent">Permanent</option>
+              <option value="fixed_term">Fixed term</option>
+              <option value="maternity_cover">Maternity cover</option>
+              <option value="interim">Interim</option>
+            </select>
+          </div>
+          <div>
+            <label>Action</label>
+            <select name="action">
+              <option value="correct">Save corrections</option>
+              <option value="hide">Not a real job — hide</option>
+            </select>
+          </div>
+        </div>
+        <div class="jd-edit-actions">
+          <button type="submit" class="jc-edit-save">Save</button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+</div>

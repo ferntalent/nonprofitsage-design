@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Schools — NonprofitSage.ai{% endblock %}
+{% block main_class %}container-full{% endblock %}
+{% block content %}
+
+<div class="master-detail">
+
+  {# -- LEFT PANEL: filters + card list -- #}
+  <div class="master-list">
+    <div class="master-list-inner">
+
+      {# Stats row #}
+      <div class="stat-card-grid cols-2 tight">
+        <div class="stat-card">
+          <div class="stat-card-number">{{ total }}</div>
+          <div class="stat-card-label">Schools</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-number highlight">{{ items|length }}</div>
+          <div class="stat-card-label">Showing</div>
+        </div>
+      </div>
+
+      <p class="page-desc">UK schools tracked for fundraising, development, and bursary roles.</p>
+
+      {# Filter form — NL search removed in #372: the form pills +
+         Name input already cover every filter the backend honours
+         (type / income / postcode), and the NL path's Haiku extraction
+         was promising filters like "recent leadership changes" the
+         query layer can't execute. #}
+      <form id="school-filters"
+            hx-get="/schools/cards"
+            hx-target="#school-card-list"
+            hx-swap="innerHTML"
+            hx-trigger="submit"
+            hx-include="#school-filters">
+
+          <input type="hidden" name="school_type" id="jval-type" value="all">
+
+          <div class="jfilters">
+              <div class="filter-row">
+                  <span class="filter-label">Type</span>
+                  <button type="button" class="filter-pill active" data-jgroup="type" data-value="all">All</button>
+                  <button type="button" class="filter-pill" data-jgroup="type" data-value="independent">Independent</button>
+                  <button type="button" class="filter-pill" data-jgroup="type" data-value="state">State</button>
+              </div>
+              <div class="filter-row">
+                  <span class="filter-label">Income</span>
+                  <select name="income_band" class="filter-input" style="min-width:100px;flex:0;">
+                      <option value="">All sizes</option>
+                      <option value="10m+">&pound;10m+</option>
+                      <option value="5-10m">&pound;5&ndash;10m</option>
+                      <option value="1-5m">&pound;1&ndash;5m</option>
+                      <option value="500k-1m">&pound;500k&ndash;1m</option>
+                      <option value="100-500k">&pound;100&ndash;500k</option>
+                  </select>
+              </div>
+              <div class="filter-row">
+                  <span class="filter-label">Postcode</span>
+                  <input type="text" name="postcode" placeholder="e.g. SW1" class="filter-input" style="min-width:80px;flex:0;width:100px;">
+                  <button type="submit" id="search-btn" class="nl-search-btn" style="padding:6px 16px;font-size:12px;">&#10140; Search</button>
+              </div>
+          </div>
+      </form>
+
+      <p class="result-count" style="margin:10px 0 6px;">
+          Showing <strong>{{ items|length }}</strong> of <strong>{{ total }}</strong> schools
+      </p>
+
+      {# Scrollable card list #}
+      <div id="school-card-list">
+          {% for item in items %}
+              {% set card_rank = loop.index %}
+              {% include "components/school_card.html" %}
+          {% endfor %}
+
+          {% if items|length < total %}
+          <button class="load-more"
+                  hx-get="/schools/cards?offset={{ offset + limit }}&limit={{ limit }}&school_type=all"
+                  hx-target="#school-card-list"
+                  hx-swap="beforeend"
+                  hx-on::after-request="this.remove()">
+              Load more
+          </button>
+          {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  {# -- RIGHT PANEL: detail view -- #}
+  <div class="master-detail-content" id="school-detail-panel">
+    <div class="detail-empty">
+      <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/><path d="M12 14l9-5-9-5-9 5 9 5z"/></svg>
+      <span>Select a school from the list to see details</span>
+      <span style="font-size:0.8rem;color:var(--text-muted);">Use &uarr;&darr; arrow keys to navigate</span>
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* Schools page local overrides */
+.jfilters { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px; display:flex; flex-direction:column; gap:6px; }
+
+/* Selected card in list */
+.jc-card.selected { border-left: 3px solid var(--pink) !important; background: var(--pink-soft); }
+
+@keyframes pulse-search {
+    0%   { box-shadow:0 2px 8px rgba(255,79,190,0.3), 0 0 0 0 rgba(255,79,190,0.65); }
+    70%  { box-shadow:0 2px 8px rgba(255,79,190,0.3), 0 0 0 14px rgba(255,79,190,0); }
+    100% { box-shadow:0 2px 8px rgba(255,79,190,0.3), 0 0 0 0 rgba(255,79,190,0); }
+}
+.search-pulse { animation: pulse-search 1.1s ease-out infinite; }
+</style>
+
+<script>
+(function() {
+    var form = document.getElementById('school-filters');
+    if (!form) return;
+    var searchBtn = document.getElementById('search-btn');
+    var jmap = { type: 'jval-type' };
+
+    var pulse = function() { searchBtn && searchBtn.classList.add('search-pulse'); };
+    var unpulse = function() { searchBtn && searchBtn.classList.remove('search-pulse'); };
+
+    form.querySelectorAll('.filter-pill[data-jgroup]').forEach(function(pill) {
+        pill.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            var group = this.dataset.jgroup;
+            form.querySelectorAll('.filter-pill[data-jgroup="' + group + '"]').forEach(function(p) {
+                p.classList.remove('active');
+                p.classList.remove('accent');
+            });
+            this.classList.add('active');
+            var targetId = jmap[group];
+            if (targetId) {
+                var hidden = document.getElementById(targetId);
+                if (hidden) hidden.value = this.dataset.value || '';
+            }
+            pulse();
+        });
+    });
+
+    form.querySelectorAll('select, input[type=text], input[type=number]').forEach(function(el) {
+        el.addEventListener('change', pulse);
+        if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number')) {
+            el.addEventListener('input', pulse);
+        }
+    });
+
+    form.addEventListener('htmx:beforeRequest', unpulse);
+
+    /* Card selection -- click to load detail */
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest('.jc-card');
+        if (!card) return;
+        /* Don't intercept clicks on links, buttons, inputs */
+        if (e.target.closest('a, button, input, select, textarea, details, summary')) return;
+        document.querySelectorAll('.jc-card.selected').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+    });
+
+    /* Keyboard navigation */
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        var cards = Array.from(document.querySelectorAll('#school-card-list .jc-card'));
+        if (!cards.length) return;
+        var selected = document.querySelector('.jc-card.selected');
+        var idx = selected ? cards.indexOf(selected) : -1;
+
+        if (e.key === 'ArrowDown' || e.key === 'j') {
+            e.preventDefault();
+            idx = Math.min(idx + 1, cards.length - 1);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp' || e.key === 'k') {
+            e.preventDefault();
+            idx = Math.max(idx - 1, 0);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        }
+    });
+
+    /* Auto-select first card after HTMX initialises */
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            var first = document.querySelector('#school-card-list .jc-card');
+            if (first) { first.click(); }
+        }, 150);
+    });
+})();
+</script>
+
+{% endblock %}

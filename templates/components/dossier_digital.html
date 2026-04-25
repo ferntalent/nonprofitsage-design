@@ -1,0 +1,17 @@
+<article class="dossier-panel">
+    <header><h3 class="ds-label" style="margin:0;">Digital Presence</h3></header>
+    {% if digital_narrative %}
+    <div class="insight-box">{{ digital_narrative }}</div>
+    {% elif digital %}
+    {# Fallback: show raw fields if narrative wasn't pre-computed #}
+    {% set d = digital[0] %}
+    <p>
+        {% if d.get('website') %}Website: <a href="{{ d['website'] }}" target="_blank" rel="noopener">{{ d['website'][:60] }}</a>. {% endif %}
+        {% if d.get('https_ok') is not none %}{% if d['https_ok'] %}HTTPS enabled.{% else %}No HTTPS.{% endif %} {% endif %}
+        {% if d.get('donate_cta_present') is not none %}{% if d['donate_cta_present'] %}Donation CTA present.{% else %}No donation button.{% endif %} {% endif %}
+        {% if d.get('digital_freshness') is not none %}Digital freshness: {{ d['digital_freshness'] }}/6.{% endif %}
+    </p>
+    {% else %}
+    <p class="panel-empty">No digital signal data available for this organisation.</p>
+    {% endif %}
+</article>

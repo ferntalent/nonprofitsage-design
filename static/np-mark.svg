@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="NonprofitSage.ai mark">
+  <circle cx="18" cy="18" r="12" fill="#FF3EA5"></circle>
+  <circle cx="46" cy="18" r="12" fill="#5A7BBF"></circle>
+  <circle cx="18" cy="46" r="12" fill="#5A7BBF"></circle>
+  <circle cx="46" cy="46" r="12" fill="#FF3EA5"></circle>
+</svg>

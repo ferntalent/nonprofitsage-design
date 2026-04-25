@@ -1,0 +1,159 @@
+{# Capture active filter values BEFORE the per-item {% set %}s below
+   shadow them. Used for card-level filter suppression — when the user
+   has already filtered to e.g. contract=permanent, every card on the
+   list has that same value, so repeating the badge is noise. Falls
+   back to '' when the include is hit outside a filter context (e.g.
+   agencies.html), in which case nothing is suppressed. Per the UX
+   review's "card-level filter suppression". #}
+{% set _flt_contract = contract_type | default('', true) %}
+{% set _flt_source = source_type | default('', true) %}
+{% set raw_org = item.get('org_name', '') or 'Unknown' %}
+{% set raw_title = item.get('job_title', '') or 'Untitled role' %}
+{% set org_id = item.get('org_id', '') %}
+{% set charity_number_ew = item.get('charity_number_ew', '') %}
+{% set salary_low = item.get('salary_low', '') %}
+{% set salary_high = item.get('salary_high', '') %}
+{% set salary_source = item.get('salary_source', '') or '' %}
+{% set salary_period = item.get('salary_period', '') or '' %}
+{% set contract = item.get('contract_type', '') %}
+{% set source_type = item.get('source_type', '') %}
+{% set readvert = item.get('readvertise_count', 0)|int %}
+{% set posted = item.get('posted_date', '') %}
+{% set closing = item.get('closing_date', '') %}
+{% set score = item.get('total_score') %}
+{% set intel_bucket = item.get('intel_bucket', '') %}
+{% set intel_pct = item.get('intel_percentile', 0) %}
+{% set job_url = item.get('job_url', '') %}
+{% set cause = item.get('cause_area', '') %}
+{% set income_band = item.get('income_band', '') %}
+{% set region = item.get('address_region', '') %}
+{% set job_func = item.get('job_function', '') %}
+{% set is_agency = item.get('is_known_agency_org') %}
+{% set website = item.get('website', '') %}
+{% set postcode = item.get('address_postcode', '') %}
+{% set hours = item.get('hours', '') %}
+{% set work_pattern = item.get('work_pattern', '') %}
+{% set location = item.get('location', '') %}
+{% set org_name = raw_org | smart_org %}
+{% set title = raw_title | smart_title %}
+{% set job_id = item.get('job_id', '') %}
+
+{# Score band logic — spec thresholds #}
+{% set _score_val = score|float if score else 0 %}
+{% if _score_val >= 25 %}
+  {% set score_pill_cls = "score-pill-hot" %}
+  {% set score_band = "Hot" %}
+{% elif _score_val >= 15 %}
+  {% set score_pill_cls = "score-pill-warm" %}
+  {% set score_band = "Warm" %}
+{% elif _score_val > 0 %}
+  {% set score_pill_cls = "score-pill-monitoring" %}
+  {% set score_band = "Monitoring" %}
+{% else %}
+  {% set score_pill_cls = "" %}
+  {% set score_band = "" %}
+{% endif %}
+
+{# Border colour #}
+{% if source_type == 'direct' %}{% set border_cls = "jc-border-growth" %}
+{% elif is_agency or readvert > 0 %}{% set border_cls = "jc-border-hot" %}
+{% else %}{% set border_cls = "" %}{% endif %}
+
+<article class="jc-card {{ border_cls }}"
+         id="job-{{ job_id }}"
+         hx-get="/jobs/detail/{{ job_id }}"
+         hx-target="#job-detail-panel"
+         hx-swap="innerHTML">
+
+  {# Quick dismiss — filters the job from future lists (stored in job_dismissals.csv) #}
+  <button type="button"
+          class="jc-dismiss-btn"
+          title="Not relevant — hide this job"
+          aria-label="Hide this job — not relevant"
+          onclick="event.stopPropagation()"
+          hx-post="/jobs/dismiss?job_id={{ job_id }}&reason=not_relevant"
+          hx-target="[id='job-{{ job_id }}']"
+          hx-swap="outerHTML"><span aria-hidden="true">✕</span></button>
+
+
+  {# Row 1: Org name (largest text) + favicon + score pill #}
+  <div class="jc-org">
+    {% if card_rank is defined %}<span class="jc-rank">#{{ card_rank }}</span>{% endif %}
+    {% if website %}
+    <img src="https://www.google.com/s2/favicons?domain={{ website|replace('https://','')|replace('http://','') }}&sz=64"
+         alt="" class="jc-favicon" onerror="this.outerHTML='<span class=jc-favicon-fb>{{ org_name[:1] }}</span>'">
+    {% else %}
+    <span class="jc-favicon-fb">{{ org_name[:1] }}</span>
+    {% endif %}
+    {% if org_id %}<a href="/org/{{ org_id }}" class="jc-org-name" onclick="event.stopPropagation()">{{ org_name | smart_org }}</a>
+    {% else %}<span class="jc-org-name">{{ org_name | smart_org }}</span>{% endif %}
+    {% if is_agency and not org_id %}<span class="jc-badge jc-badge-agency">Agency</span>{% endif %}
+    {% if score_band %}
+    <span class="score-pill score-pill-push-right {{ score_pill_cls }}">{{ _score_val|round(1) }} · {{ score_band }}</span>
+    {% endif %}
+  </div>
+
+  {# Row 2: Job title (smaller than org) #}
+  <div class="jc-title-row">
+    {% set rel_tier = item.get('relevance_tier', '') %}
+    {% set rel_reason = item.get('relevance_reason', '') %}
+    {% if rel_tier == 'primary' %}<span class="jc-rel-dot jc-rel-primary" title="Primary match — {{ rel_reason }}"></span>
+    {% elif rel_tier == 'secondary' %}<span class="jc-rel-dot jc-rel-secondary" title="Secondary match — {{ rel_reason }}"></span>
+    {% elif rel_tier == 'peripheral' %}<span class="jc-rel-dot jc-rel-peripheral" title="Peripheral — {{ rel_reason }}"></span>
+    {% endif %}
+    {% if job_url %}<a href="{{ job_url }}" target="_blank" rel="noopener" class="jc-title" onclick="event.stopPropagation()">{{ title }}</a>
+    {% else %}<span class="jc-title">{{ title }}</span>{% endif %}
+  </div>
+
+  {# Row 3: Compact metadata #}
+  <div class="jc-meta">
+    {% set _sal_low = salary_low|float if salary_low and salary_low|string not in ('','nan','None') else 0 %}
+    {% set _sal_high = salary_high|float if salary_high and salary_high|string not in ('','nan','None') else 0 %}
+    {% if salary_period == 'daily' and (_sal_low > 0 or _sal_high > 0) %}
+      {% set _day = (_sal_high if _sal_high > 0 else _sal_low)|int %}
+      {% set _ann = (_day * 220)|round(-3)|int %}
+      <span class="jc-salary-strong">&pound;{{ _day }}/day</span><span class="jc-salary-suffix"> (~&pound;{{ '{:,}'.format(_ann) }})</span><span class="jc-sep">·</span>
+    {% elif _sal_low > 1000 and _sal_high > 1000 and _sal_high > _sal_low %}
+      <span class="jc-salary-strong">&pound;{{ '{:,}'.format(((_sal_low + _sal_high) / 2)|round|int) }}</span><span class="jc-sep">·</span>
+    {% elif _sal_low > 1000 %}
+      <span class="jc-salary-strong">&pound;{{ '{:,}'.format(_sal_low|int) }}</span><span class="jc-sep">·</span>
+    {% endif %}
+    {% if location or postcode %}<span>{{ location or postcode }}</span><span class="jc-sep">·</span>{% endif %}
+    {% if contract and contract != 'unknown' and contract != _flt_contract %}
+      {% if contract == 'maternity_cover' %}<span class="jc-badge jc-badge-maternity">Maternity</span>
+      {% elif contract == 'interim' %}<span class="jc-badge jc-badge-interim">Interim</span>
+      {% elif contract == 'fixed_term' %}<span class="jc-badge jc-badge-fixed">Fixed term</span>
+      {% else %}<span class="jc-badge jc-badge-perm">Permanent</span>{% endif %}
+    {% endif %}
+    {% if not _flt_source %}
+      {% if source_type == 'direct' %}<span class="jc-sep">·</span><span>Direct</span>
+      {% elif source_type == 'agency' %}<span class="jc-sep">·</span><span>Agency</span>
+      {% else %}<span class="jc-sep">·</span><span>Advert</span>{% endif %}
+    {% endif %}
+    {% if readvert > 0 %}
+    <span class="jc-badge jc-badge-readvert">↻ Re-listed{% if readvert > 1 %} ×{{ readvert }}{% endif %}</span>
+    {% endif %}
+  </div>
+
+  {# Row 4: Closing urgency (if applicable) #}
+  {% if closing %}
+  <div class="jc-dates">
+    <script>
+    (function(){
+      var close = new Date('{{ closing }}');
+      var now = new Date();
+      var diff = Math.ceil((close - now) / 86400000);
+      if (diff >= 0 && diff <= 14) {
+        var el = document.currentScript.parentElement;
+        var label = diff === 0 ? 'Closes today' : diff === 1 ? 'Closes tomorrow' : 'Closes in ' + diff + ' days';
+        var span = document.createElement('strong');
+        span.className = diff <= 3 ? 'jc-closing-urgent' : 'jc-closing-soon';
+        span.textContent = label;
+        el.appendChild(span);
+      }
+    })();
+    </script>
+  </div>
+  {% endif %}
+
+</article>

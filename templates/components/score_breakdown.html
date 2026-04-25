@@ -1,0 +1,19 @@
+{# Score breakdown — Financial / Workforce / Digital / Governance / Delivery
+   sub-score pills. Expects ``item`` in scope (any dict with the *_subscore
+   keys produced by scripts/score_orgs.py). Renders nothing when all
+   subscores are absent or zero — safe to include unconditionally. #}
+{% set _fin  = item.get('financial_subscore')  | clean_score %}
+{% set _work = item.get('workforce_subscore')  | clean_score %}
+{% set _digi = item.get('digital_subscore')    | clean_score %}
+{% set _gov  = item.get('governance_subscore') | clean_score %}
+{% set _del  = item.get('delivery_subscore')   | clean_score %}
+{% if _fin > 0 or _work > 0 or _digi > 0 or _gov > 0 or _del > 0 %}
+<div class="ds-label">Score Breakdown</div>
+<div class="jd-badge-row" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;">
+  {% if _fin  > 0 %}<span class="badge badge-monitor">Financial: {{ _fin|round(0)|int }}</span>{% endif %}
+  {% if _work > 0 %}<span class="badge badge-monitor">Workforce: {{ _work|round(0)|int }}</span>{% endif %}
+  {% if _digi > 0 %}<span class="badge badge-monitor">Digital: {{ _digi|round(0)|int }}</span>{% endif %}
+  {% if _gov  > 0 %}<span class="badge badge-monitor">Governance: {{ _gov|round(0)|int }}</span>{% endif %}
+  {% if _del  > 0 %}<span class="badge badge-monitor">Delivery: {{ _del|round(0)|int }}</span>{% endif %}
+</div>
+{% endif %}

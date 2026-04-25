@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Data quality — NonprofitSage.ai{% endblock %}
+{% block content %}
+
+<div style="max-width: 900px; margin: 0 auto; padding: 24px 0;">
+  <h1>Data quality</h1>
+  <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0 0 1.25rem; max-width: 680px;">
+    Coverage of the core tables — orgs, people, contacts, annual-report insights,
+    peer analyses, events, and Derrick enrichment credits. Use this to spot
+    which pipeline runs are due.
+  </p>
+
+  <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.2rem;">
+    {% include "admin/data_quality_fragment.html" %}
+  </div>
+</div>
+
+{% endblock %}

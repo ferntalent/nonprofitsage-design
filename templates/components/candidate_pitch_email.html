@@ -1,0 +1,59 @@
+{#
+  One draft-email card. Rendered inside the "Draft emails" tab.
+
+  The email is FROM Tim Barnes (Fern Talent) TO the candidate, introducing
+  a specific role at the target org. Tim's sign-off is already appended to
+  `body` in Python (see PITCH_EMAIL_SIGNATURE), so Copy and Open-in-Gmail
+  carry the full message verbatim.
+
+  Context:
+    rank                 : 1-based position in the emails list
+    org_name             : target org (smart-cased upstream)
+    subject              : suggested subject line (str)
+    body                 : email body incl. Tim's sign-off (\n\n between paragraphs)
+    rationale            : optional one-line "why this match" (recruiter-internal)
+    charity_number_ew    : optional — wires a Report link
+    candidate_first_name : for the card header "Draft email to {name} — {org}"
+    candidate_email      : optional — when present, "Open in Gmail" pre-fills the
+                           recipient. Empty string when the CV didn't include one.
+#}
+<div class="cp-email-card">
+  <div class="cp-email-head">
+    <span class="cp-org-rank">#{{ rank }}</span>
+    <strong class="cp-email-org">
+      Draft email to
+      {% if candidate_first_name %}{{ candidate_first_name }}{% else %}candidate{% endif %}
+      &mdash; {{ org_name | smart_org }}
+    </strong>
+  </div>
+  {% if subject %}
+    <div class="cp-email-subject"><span class="cp-email-label">Subject</span>{{ subject }}</div>
+  {% endif %}
+  <pre class="cp-email-body">{{ body }}</pre>
+  {% if rationale %}
+    <div class="cp-email-rationale">{{ rationale }}</div>
+  {% endif %}
+  <div class="cp-email-actions">
+    <button type="button" class="cp-email-copy"
+            onclick="(function(btn){
+              var pre = btn.closest('.cp-email-card').querySelector('.cp-email-body');
+              if (!pre) return;
+              if (navigator.clipboard) {
+                navigator.clipboard.writeText(pre.innerText).then(function(){
+                  btn.textContent = 'Copied'; setTimeout(function(){btn.textContent='Copy email';}, 1400);
+                });
+              } else {
+                var r = document.createRange(); r.selectNodeContents(pre);
+                var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+              }
+            })(this)">Copy email</button>
+    {% if candidate_email %}
+      <a class="cp-email-gmail"
+         href="https://mail.google.com/mail/?view=cm&amp;to={{ candidate_email | urlencode }}&amp;su={{ subject | urlencode }}&amp;body={{ body | urlencode }}"
+         target="_blank" rel="noopener">Open in Gmail</a>
+    {% endif %}
+    {% if charity_number_ew %}
+      <a href="/api/org/{{ charity_number_ew }}/dossier" target="_blank">Report</a>
+    {% endif %}
+  </div>
+</div>

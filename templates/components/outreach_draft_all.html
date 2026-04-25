@@ -1,0 +1,69 @@
+{# Multi-contact outreach drafts — one accordion per contact. #}
+<div class="outreach-multi-wrap"
+     style="padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);">
+  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;">
+    <h4 style="font-size:13px;font-weight:700;color:var(--navy);margin:0;">
+      Drafts for {{ drafts | length }} contact{% if drafts | length != 1 %}s{% endif %} at {{ org_name or 'this organisation' }}
+    </h4>
+    <button type="button"
+            class="btn-ghost"
+            style="font-size:11px;padding:2px 8px;border:1px solid var(--border);background:var(--bg);border-radius:6px;color:var(--text-muted);cursor:pointer;margin-left:auto;"
+            onclick="this.closest('.outreach-multi-wrap').remove();">
+      &times; Close
+    </button>
+  </div>
+
+  {% for d in drafts %}
+  <details style="margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);" {% if loop.first %}open{% endif %}>
+    <summary style="padding:8px 12px;cursor:pointer;font-size:12.5px;color:var(--text-primary);display:flex;align-items:baseline;gap:10px;">
+      <strong>{{ d.contact.name or 'Unknown contact' }}</strong>
+      {% if d.contact.role_title %}<span style="color:var(--text-muted);font-size:11px;">{{ d.contact.role_title }}</span>{% endif %}
+      <span style="color:var(--steel);font-size:11px;margin-left:auto;">{{ d.contact.email or '—' }}</span>
+    </summary>
+    <div style="padding:12px;background:var(--surface);border-top:1px solid var(--border);">
+      {% if not d.draft %}
+        <div style="color:var(--amber);font-size:12px;">
+          Draft unavailable for this contact. Retry via the single-contact drafter.
+        </div>
+      {% else %}
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;margin-bottom:2px;">Subject</div>
+        <div style="font-size:13px;color:var(--text-primary);font-weight:600;margin-bottom:8px;">{{ d.draft.subject }}</div>
+
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;margin-bottom:2px;">Body</div>
+        <pre style="white-space:pre-wrap;font-family:'Open Sans',sans-serif;font-size:12.5px;color:var(--text-primary);margin:0 0 10px;line-height:1.55;">{{ d.draft.body }}</pre>
+
+        {% if d.draft.warnings %}
+        <div style="color:var(--amber);font-size:11px;margin-bottom:8px;">
+          {% for w in d.draft.warnings %}{{ w }}<br>{% endfor %}
+        </div>
+        {% endif %}
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          {% if d.gmail_url %}
+          <a href="{{ d.gmail_url }}" target="_blank" rel="noopener"
+             class="btn-primary"
+             style="font-size:11.5px;padding:5px 12px;text-decoration:none;border-radius:6px;background:var(--navy);color:#fff;font-weight:700;">
+            Open in Gmail
+          </a>
+          {% endif %}
+          <form hx-post="/api/outreach/mark-sent"
+                hx-swap="outerHTML"
+                hx-target="this"
+                style="display:inline-flex;gap:6px;align-items:center;">
+            <input type="hidden" name="contact_id" value="{{ d.contact.contact_id }}">
+            <input type="hidden" name="org_id" value="{{ org_id }}">
+            <input type="hidden" name="subject" value="{{ d.draft.subject | e }}">
+            <input type="hidden" name="body" value="{{ d.draft.body | e }}">
+            <input type="hidden" name="method" value="email">
+            <button type="submit"
+                    class="btn-ghost"
+                    style="font-size:11.5px;padding:5px 10px;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);border-radius:6px;cursor:pointer;">
+              Mark as sent
+            </button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </details>
+  {% endfor %}
+</div>

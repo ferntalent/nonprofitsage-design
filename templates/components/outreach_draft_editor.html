@@ -1,0 +1,87 @@
+{# Phase 4: shown after /api/outreach/draft returns a Haiku-generated draft.
+   The subject + body are editable; clicking "Send via Gmail" submits to
+   /api/outreach/finalise which creates the attachment (if ticked), records
+   the outreach_event row, and returns a send-ready fragment with a
+   "Open in Gmail" button. #}
+<div class="outreach-drawer" id="outreach-drawer-{{ contact.contact_id }}"
+     style="margin-top:8px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);">
+
+  <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:700;color:var(--text-primary);font-size:13px;">
+        Draft for {{ contact.name }}
+      </div>
+      <div style="color:var(--text-muted);font-size:11px;">
+        {{ contact.role_title or '' }}{% if org_name %} &middot; {{ org_name }}{% endif %}
+      </div>
+    </div>
+    <button type="button"
+            class="btn-ghost"
+            style="font-size:11px;padding:2px 8px;border:1px solid var(--border);background:var(--bg);border-radius:6px;color:var(--text-muted);cursor:pointer;"
+            onclick="document.getElementById('outreach-drawer-{{ contact.contact_id }}').remove();">
+      &times; Close
+    </button>
+  </div>
+
+  {% if draft.warnings %}
+  <div style="background:var(--amber-soft);color:var(--amber);font-size:11px;padding:6px 10px;border-radius:6px;margin-bottom:10px;">
+    &#9888; {{ draft.warnings | join('; ') }}
+  </div>
+  {% endif %}
+
+  <form hx-post="/api/outreach/finalise"
+        hx-target="#outreach-drawer-{{ contact.contact_id }}"
+        hx-swap="outerHTML"
+        hx-indicator="#finalise-ind-{{ contact.contact_id }}">
+    <input type="hidden" name="contact_id" value="{{ contact.contact_id }}">
+    <input type="hidden" name="sent_by"    value="{{ request.session.user.name if request and request.session and request.session.user else '' }}">
+
+    <label style="display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">
+      Subject
+    </label>
+    <input type="text" name="subject" value="{{ draft.subject }}"
+           style="width:100%;font-size:13px;font-family:'Open Sans',sans-serif;border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin-bottom:10px;color:var(--text-primary);">
+
+    <label style="display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">
+      Body
+    </label>
+    <textarea name="body" rows="12"
+              style="width:100%;font-size:12.5px;font-family:'Open Sans',sans-serif;border:1px solid var(--border);border-radius:6px;padding:8px;resize:vertical;color:var(--text-primary);line-height:1.5;">{{ draft.body }}</textarea>
+
+    <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <label style="font-size:11.5px;color:var(--text-secondary);cursor:pointer;">
+        <input type="checkbox" name="attach_report" value="1" {% if attach_report_default %}checked{% endif %}>
+        Attach intelligence briefing PDF
+      </label>
+      <span style="flex:1;"></span>
+      <button type="submit" class="btn-primary" style="font-size:12px;padding:5px 14px;">
+        Send via Gmail
+      </button>
+      <span id="finalise-ind-{{ contact.contact_id }}" class="htmx-indicator" style="font-size:11px;color:var(--text-muted);">
+        Preparing…
+      </span>
+    </div>
+  </form>
+
+  {# Mark-as-sent escape hatch: use when the email was sent outside Gmail
+     (Outlook, LinkedIn DM, etc.) so the outreach event is still logged. #}
+  <form hx-post="/api/outreach/mark-sent"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-include="closest .outreach-drawer"
+        style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <input type="hidden" name="contact_id" value="{{ contact.contact_id }}">
+    <input type="hidden" name="org_id" value="{{ org_id }}">
+    <select name="method" style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:3px 6px;">
+      <option value="email">Email (external)</option>
+      <option value="linkedin">LinkedIn</option>
+      <option value="phone">Phone</option>
+      <option value="meeting">Meeting</option>
+    </select>
+    <button type="submit"
+            class="btn-ghost"
+            style="font-size:11px;padding:4px 10px;border:1px solid var(--border);background:var(--bg);border-radius:6px;color:var(--text-muted);cursor:pointer;">
+      Mark as sent (logs without Gmail)
+    </button>
+  </form>
+</div>

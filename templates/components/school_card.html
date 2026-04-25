@@ -1,0 +1,72 @@
+{% set org_id = item.get('org_id', '') %}
+{% set org_name_raw = item.get('org_name', '') or org_id %}
+{% set org_name = org_name_raw | smart_org %}
+{% set score = item.get('total_score') %}
+{% set score_band_val = item.get('score_band', '') %}
+{% set school_type = item.get('school_type', '') %}
+{% set income = item.get('latest_total_gross_income', 0) %}
+{% set postcode = item.get('address_postcode', '') %}
+{% set region = item.get('address_region', '') %}
+{% set website = item.get('website', '') %}
+{% set charity_number_ew = item.get('charity_number_ew', '') %}
+{% set classifications = item.get('classifications', '') %}
+
+{# Score band logic #}
+{% set _score_val = score|float if score else 0 %}
+{% if _score_val >= 60 %}
+  {% set score_pill_cls = "score-pill-hot" %}
+  {% set band_label = "Hot" %}
+{% elif _score_val >= 20 %}
+  {% set score_pill_cls = "score-pill-warm" %}
+  {% set band_label = "Warm" %}
+{% elif _score_val > 0 %}
+  {% set score_pill_cls = "score-pill-monitoring" %}
+  {% set band_label = "Watch" %}
+{% else %}
+  {% set score_pill_cls = "" %}
+  {% set band_label = "" %}
+{% endif %}
+
+{# Income formatting #}
+{% set _inc = income|float if income and income|string not in ('','nan','None') else 0 %}
+{% if _inc >= 1000000 %}
+  {% set inc_str = "&pound;%.1fm"|format(_inc / 1000000) %}
+{% elif _inc >= 1000 %}
+  {% set inc_str = "&pound;%.0fk"|format(_inc / 1000) %}
+{% else %}
+  {% set inc_str = "" %}
+{% endif %}
+
+<article class="jc-card"
+         id="school-{{ org_id }}"
+         hx-get="/schools/detail/{{ org_id }}"
+         hx-target="#school-detail-panel"
+         hx-swap="innerHTML"
+         style="cursor:pointer;">
+
+  {# Row 1: Org name + favicon + score pill #}
+  <div class="jc-org">
+    {% if card_rank is defined %}<span class="jc-rank">#{{ card_rank }}</span>{% endif %}
+    {% if website %}
+    <img src="https://www.google.com/s2/favicons?domain={{ website|replace('https://','')|replace('http://','') }}&sz=64"
+         alt="" class="jc-favicon" onerror="this.outerHTML='<span class=jc-favicon-fb>{{ org_name[:1] }}</span>'">
+    {% else %}
+    <span class="jc-favicon-fb">{{ org_name[:1] }}</span>
+    {% endif %}
+    <a href="/org/{{ org_id }}" class="jc-org-name" onclick="event.stopPropagation()">{{ org_name | smart_org }}</a>
+    {% if band_label %}
+    <span class="score-pill {{ score_pill_cls }}" style="margin-left:auto;">{{ _score_val|round(0)|int }} &middot; {{ band_label }}</span>
+    {% endif %}
+  </div>
+
+  {# Row 2: School type + metadata #}
+  <div class="jc-meta">
+    {% if school_type %}
+    <span class="jc-badge jc-badge-perm">{{ school_type }}</span>
+    {% endif %}
+    {% if inc_str %}<span style="font-weight:700;color:var(--text-primary);">{{ inc_str }}</span><span class="jc-sep">&middot;</span>{% endif %}
+    {% if region %}<span>{{ region }}</span>{% endif %}
+    {% if postcode %}<span class="jc-sep">&middot;</span><span>{{ postcode }}</span>{% endif %}
+  </div>
+
+</article>

@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}Contracts — NonprofitSage.ai{% endblock %}
+{% block main_class %}container-full{% endblock %}
+{% block content %}
+
+<div class="master-detail">
+
+  {# -- LEFT PANEL: stats + filters + card list -- #}
+  <div class="master-list">
+    <div class="master-list-inner">
+
+      {# Stats row #}
+      <div class="stat-card-grid" id="contract-stats">
+        <div class="stat-card">
+          <div class="stat-card-number">{{ total }}</div>
+          <div class="stat-card-label">Temp Roles Tracked</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-number" id="stat-ending-soon">{{ ending_soon_count }}</div>
+          <div class="stat-card-label">Ending Within 90d</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-number steel">{{ approaching_count }}</div>
+          <div class="stat-card-label">Within 6 Months</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-number highlight">{{ fern_relevant_count }}</div>
+          <div class="stat-card-label" title="Roles matching Fern Talent's recruitment specialisms">Relevant to Fern</div>
+        </div>
+      </div>
+
+      <p class="page-desc">Temporary and fixed-term roles nearing their end date — these often convert into permanent hires.</p>
+
+      {# Filter pills #}
+      <div class="filter-row" id="contract-filters">
+        <span class="filter-label">Filter</span>
+        <button type="button" class="filter-pill {{ 'active' if current_filter == 'all' }}"
+                data-filter="all"
+                hx-get="/contracts/cards?filter=all"
+                hx-target="#contract-card-list"
+                hx-swap="innerHTML">All ({{ total }})</button>
+        <button type="button" class="filter-pill {{ 'active' if current_filter == 'ending_soon' }}"
+                data-filter="ending_soon"
+                hx-get="/contracts/cards?filter=ending_soon"
+                hx-target="#contract-card-list"
+                hx-swap="innerHTML">Ending Soon ({{ ending_soon_count }})</button>
+        <button type="button" class="filter-pill {{ 'active' if current_filter == 'approaching' }}"
+                data-filter="approaching"
+                hx-get="/contracts/cards?filter=approaching"
+                hx-target="#contract-card-list"
+                hx-swap="innerHTML">Within 6mo ({{ approaching_count }})</button>
+        <button type="button" class="filter-pill {{ 'active' if current_filter == 'fern_relevant' }}"
+                data-filter="fern_relevant"
+                hx-get="/contracts/cards?filter=fern_relevant"
+                hx-target="#contract-card-list"
+                hx-swap="innerHTML">Relevant to Fern ({{ fern_relevant_count }})</button>
+      </div>
+
+      <p class="result-count">
+        Showing <strong>{{ contracts|length }}</strong> contracts
+      </p>
+
+      {# Scrollable card list #}
+      <div id="contract-card-list">
+        {% if contracts %}
+          {% for c in contracts %}
+          {% set urgency_border = 'jc-border-hot' if c.urgency == 'ending_soon' else ('jc-border-growth' if c.urgency == 'approaching' else '') %}
+          <article class="jc-card {{ urgency_border }}"
+                   id="contract-{{ c.job_id }}"
+                   hx-get="/contracts/detail/{{ c.job_id }}"
+                   hx-target="#contract-detail-panel"
+                   hx-swap="innerHTML">
+
+            {# Row 1: Org name + favicon #}
+            <div class="jc-org">
+              {% if c.source_url and c.source_url != 'None' %}
+              <img src="https://www.google.com/s2/favicons?domain={{ c.source_url|replace('https://','')|replace('http://','') }}&sz=64"
+                   alt="" class="jc-favicon"
+                   onerror="this.outerHTML='<span class=jc-favicon-fb>{{ c.org_name[:1] }}</span>'">
+              {% else %}
+              <span class="jc-favicon-fb">{{ c.org_name[:1] }}</span>
+              {% endif %}
+              {% if c.org_id and c.org_id != 'None' %}
+                <a href="/org/{{ c.org_id }}" class="jc-org-name" onclick="event.stopPropagation()">{{ c.org_name | smart_org }}</a>
+              {% else %}
+                <span class="jc-org-name">{{ c.org_name | smart_org }}</span>
+              {% endif %}
+              {% if c.is_fern_relevant %}
+                <span class="score-pill score-pill-warm" style="margin-left:auto;">Fern</span>
+              {% endif %}
+            </div>
+
+            {# Row 2: Job title #}
+            <div class="jc-title-row">
+              {% if c.source_url and c.source_url != 'None' %}
+                <a href="{{ c.source_url }}" target="_blank" rel="noopener" class="jc-title" onclick="event.stopPropagation()">{{ c.job_title }}</a>
+              {% else %}
+                <span class="jc-title">{{ c.job_title }}</span>
+              {% endif %}
+            </div>
+
+            {# Row 3: Compact metadata #}
+            <div class="jc-meta">
+              {% if c.salary_display %}
+                <span class="jc-salary">{{ c.salary_display }}</span><span class="jc-sep">·</span>
+              {% endif %}
+              {% if c.contract_type == 'maternity_cover' %}
+                <span class="jc-badge jc-badge-maternity">Maternity Cover</span>
+              {% elif c.contract_type == 'interim' %}
+                <span class="jc-badge jc-badge-interim">Interim</span>
+              {% elif c.contract_type == 'fixed_term' %}
+                <span class="jc-badge jc-badge-fixed">Fixed Term</span>
+              {% endif %}
+              <span class="jc-sep">·</span>
+              <span>~{{ c.duration_months }}mo</span>
+            </div>
+
+            {# Row 4: End date urgency #}
+            <div class="jc-dates">
+              {% if c.days_until_end < 0 %}
+                <strong class="jc-closing-urgent">Ended {{ -c.days_until_end }}d ago</strong>
+              {% elif c.days_until_end == 0 %}
+                <strong class="jc-closing-urgent">Ending today</strong>
+              {% elif c.days_until_end <= 90 %}
+                <strong class="jc-closing-urgent">{{ c.days_until_end }}d left</strong>
+              {% elif c.days_until_end <= 180 %}
+                <strong class="jc-closing-soon">{{ c.days_until_end }}d left</strong>
+              {% else %}
+                <span>{{ c.days_until_end }}d left</span>
+              {% endif %}
+              <span class="jc-sep">·</span>
+              <span>Est. end: {{ c.estimated_end }}</span>
+            </div>
+
+          </article>
+          {% endfor %}
+        {% else %}
+          <div class="detail-empty">
+            <span>No contracts match this filter.</span>
+          </div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  {# -- RIGHT PANEL: detail view -- #}
+  <div class="master-detail-content" id="contract-detail-panel">
+    <div class="detail-empty">
+      <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      <span>Select a contract from the list to see details</span>
+      <span class="contract-hint">Use arrow keys to navigate</span>
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* Contracts page — local overrides */
+#contract-stats { grid-template-columns: repeat(4, 1fr); margin-bottom: 12px; }
+#stat-ending-soon { color: var(--red); }
+.contract-hint { font-size: 0.8rem; color: var(--text-muted); }
+.jc-card { cursor: pointer; }
+.jc-card.selected { border-left: 3px solid var(--pink) !important; background: var(--pink-soft); }
+</style>
+
+<script>
+(function() {
+    /* Filter pill toggle */
+    var filters = document.getElementById('contract-filters');
+    if (filters) {
+        filters.querySelectorAll('.filter-pill').forEach(function(pill) {
+            pill.addEventListener('click', function() {
+                filters.querySelectorAll('.filter-pill').forEach(function(p) { p.classList.remove('active'); });
+                pill.classList.add('active');
+            });
+        });
+    }
+
+    /* Card selection — click to load detail */
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest('.jc-card');
+        if (!card) return;
+        if (e.target.closest('a, button, input, select, textarea, details, summary')) return;
+        document.querySelectorAll('.jc-card.selected').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+    });
+
+    /* Keyboard navigation */
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        var cards = Array.from(document.querySelectorAll('#contract-card-list .jc-card'));
+        if (!cards.length) return;
+        var selected = document.querySelector('.jc-card.selected');
+        var idx = selected ? cards.indexOf(selected) : -1;
+
+        if (e.key === 'ArrowDown' || e.key === 'j') {
+            e.preventDefault();
+            idx = Math.min(idx + 1, cards.length - 1);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp' || e.key === 'k') {
+            e.preventDefault();
+            idx = Math.max(idx - 1, 0);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        }
+    });
+
+    /* Auto-select first card after HTMX initialises */
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            var first = document.querySelector('#contract-card-list .jc-card');
+            if (first) { first.click(); }
+        }, 150);
+    });
+})();
+</script>
+
+{% endblock %}

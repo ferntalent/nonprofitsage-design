@@ -1,0 +1,42 @@
+<article class="dossier-panel">
+    <header><h3 class="ds-label" style="margin:0;">Financial Overview</h3></header>
+    {% if financial_narrative %}
+    <div class="insight-box">{{ financial_narrative }}</div>
+    {% endif %}
+    {% if features %}
+    <table role="grid">
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set f = features[0] %}
+            {% for key in ['latest_income', 'latest_expenditure', 'total_reserves', 'months_reserves', 'income_trend_3y', 'fundraising_roi', 'staff_costs_ratio', 'grant_income_ratio', 'statutory_income_ratio'] %}
+                {% if f.get(key) is not none and f.get(key) != '' %}
+                <tr>
+                    <td>{{ key | replace('_', ' ') | title }}</td>
+                    <td class="{{ f.get(key + '_level', '') }}">
+                        {% set val = f[key] %}
+                        {% if 'months' in key %}
+                            {{ "%.1f"|format(val|float) }} months
+                        {% elif 'trend' in key %}
+                            {{ "%.1f%%"|format((val|float) * 100) if val else '—' }}
+                        {% elif 'ratio' in key or 'roi' in key %}
+                            {{ "%.1f%%"|format((val|float) * 100) if val else '—' }}
+                        {% elif 'income' in key or 'expenditure' in key or 'reserves' in key %}
+                            &pound;{{ "{:,.0f}".format(val|float) if val else '—' }}
+                        {% else %}
+                            {{ val }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="panel-empty">No financial data available for this organisation.</p>
+    {% endif %}
+</article>

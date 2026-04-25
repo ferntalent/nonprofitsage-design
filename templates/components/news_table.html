@@ -1,0 +1,96 @@
+{# HTMX fragment: news table body + pagination. Included by news.html and returned by /news/list. #}
+<div class="news-table-wrap">
+  {% if rows %}
+  <table class="news-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Headline</th>
+        <th>Source</th>
+        <th>Affects</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="news-date">{{ r._date_only.strftime('%d %b %Y') }}</td>
+        <td class="news-headline">
+          {% if r.link %}
+            <a href="{{ r.link }}" target="_blank" rel="noopener noreferrer">{{ r.headline or '(no headline)' }}</a>
+          {% else %}
+            {{ r.headline or '(no headline)' }}
+          {% endif %}
+        </td>
+        <td class="news-source">{{ r.source_name or '—' }}</td>
+        <td class="news-affects">
+          {% if r.breadth_mode == 'general' %}
+            {# Story had no matched orgs — neutral label, no expansion. #}
+            <span class="news-affects-label news-affects-general">{{ r.breadth_label }}</span>
+          {% elif r.breadth_mode == 'named' %}
+            {# 1-3 affected: show names inline, each linking to the report page. #}
+            {% for a in r.affected %}
+              {% if a.org_id and a.org_name %}
+                <a href="/org/{{ a.org_id }}">{{ a.org_name|smart_org }}</a>{% if not loop.last %}, {% endif %}
+              {% elif a.org_name %}
+                <span class="muted">{{ a.org_name|smart_org }}</span>{% if not loop.last %}, {% endif %}
+              {% endif %}
+            {% else %}
+              <span class="muted">—</span>
+            {% endfor %}
+          {% else %}
+            {# 4+ affected: breadth label + expandable list. #}
+            <details class="news-affects-details">
+              <summary>
+                <span class="news-affects-label news-affects-{{ r.breadth_mode }}">{{ r.breadth_label }}</span>
+                <span class="news-affects-count"> · {{ r.breadth_detail }}</span>
+              </summary>
+              <div class="news-affects-list">
+                {% for a in r.affected %}
+                  {% if a.org_id and a.org_name %}
+                    <a href="/org/{{ a.org_id }}">{{ a.org_name|smart_org }}</a>{% if not loop.last %} · {% endif %}
+                  {% elif a.org_name %}
+                    <span class="muted">{{ a.org_name|smart_org }}</span>{% if not loop.last %} · {% endif %}
+                  {% endif %}
+                {% endfor %}
+                {% if r.affected_truncated %}
+                  <span class="muted"> · + {{ r.affected_truncated }} more</span>
+                {% endif %}
+              </div>
+            </details>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="news-pagination">
+    <div>
+      Showing {{ (page - 1) * page_size + 1 }}–{{ (page - 1) * page_size + rows|length }} of {{ total }}
+    </div>
+    <div>
+      {% set common = "source=" ~ selected_source ~ "&q=" ~ q ~ "&date_from=" ~ date_from ~ "&date_to=" ~ date_to %}
+      {% if page > 1 %}
+        <a class="pager-btn"
+           hx-get="/news/list?{{ common }}&page={{ page - 1 }}"
+           hx-target="#news-results" hx-swap="innerHTML"
+           href="#">← Prev</a>
+      {% else %}
+        <span class="pager-btn disabled">← Prev</span>
+      {% endif %}
+      &nbsp;Page {{ page }} of {{ pages }}&nbsp;
+      {% if page < pages %}
+        <a class="pager-btn"
+           hx-get="/news/list?{{ common }}&page={{ page + 1 }}"
+           hx-target="#news-results" hx-swap="innerHTML"
+           href="#">Next →</a>
+      {% else %}
+        <span class="pager-btn disabled">Next →</span>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="news-summary">
+    No news matches these filters. Try widening the date range or clearing the search.
+  </div>
+  {% endif %}
+</div>

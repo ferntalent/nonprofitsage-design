@@ -1,0 +1,12 @@
+{# Filter pills for review categories. Rendered by /admin/review and
+   re-rendered standalone by /admin/review/fragment/filters for live refresh.
+   The 'All' pill is a full page navigation, so its counts can update on
+   the same spot. #}
+<span class="filter-label">Category</span>
+<a href="/admin/review?sort={{ current_sort }}"
+   class="filter-pill {{ 'active' if not current_category }}">All ({{ total_pending }})</a>
+{% for cat, label in category_labels.items() %}
+{% set c = categories.get(cat, 0) %}
+<a href="/admin/review?category={{ cat }}&sort={{ current_sort }}"
+   class="filter-pill {{ 'active' if current_category == cat }}">{{ label }} ({{ c }})</a>
+{% endfor %}

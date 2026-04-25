@@ -1,0 +1,54 @@
+{% set item_id = item.get('item_id', '') %}
+{% set category = item.get('category', '') %}
+{% set org_name = item.get('org_name', 'Unknown') %}
+{% set org_id = item.get('org_id', '') %}
+{% set title = item.get('title', '') %}
+{% set detail = item.get('detail', '') %}
+{% set source_value = item.get('source_value', '') %}
+{% set suggested_value = item.get('suggested_value', '') %}
+{% set source_url = item.get('source_url', '') %}
+{% set flagged_at = item.get('flagged_at', '') %}
+{% set safe_id = item_id|replace(':', '-')|replace(' ', '-') %}
+
+{% if category == 'salary_anomaly' %}{% set cat_label = "Salary" %}{% set cat_cls = "jc-badge-warm" %}
+{% elif category == 'guess_charity_unconfirmed' %}{% set cat_label = "Unconfirmed" %}{% set cat_cls = "jc-badge-fixed" %}
+{% elif category == 'org_match_ambiguous' %}{% set cat_label = "Ambiguous Org" %}{% set cat_cls = "jc-badge-hot" %}
+{% elif category == 'contract_type_uncertain' %}{% set cat_label = "Contract" %}{% set cat_cls = "jc-badge-agency" %}
+{% elif category == 'scrape_error_high_value' %}{% set cat_label = "Scrape Error" %}{% set cat_cls = "jc-badge-readvert" %}
+{% elif category == 'digital_failure' %}{% set cat_label = "Data Quality" %}{% set cat_cls = "jc-badge-also" %}
+{% else %}{% set cat_label = category %}{% set cat_cls = "jc-badge-func" %}
+{% endif %}
+
+<article class="jc-card ar-card" id="ar-{{ safe_id }}"
+         hx-get="/admin/review/detail/{{ item_id }}"
+         hx-target="#review-detail-panel"
+         hx-swap="innerHTML">
+
+  {# Row 1: Org name #}
+  <div class="jc-org">
+    <span class="jc-favicon-fb">{{ org_name[:1] }}</span>
+    {% if org_id %}
+      <a href="/org/{{ org_id }}" class="jc-org-name" onclick="event.stopPropagation()">{{ org_name | smart_org }}</a>
+    {% else %}
+      <span class="jc-org-name">{{ org_name | smart_org }}</span>
+    {% endif %}
+    <span class="jc-badge {{ cat_cls }}" style="margin-left:auto;">{{ cat_label }}</span>
+  </div>
+
+  {# Row 2: Title #}
+  <div class="jc-title-row">
+    {% if source_url %}
+      <a href="{{ source_url }}" target="_blank" rel="noopener" class="jc-title" onclick="event.stopPropagation()">{{ title }}</a>
+    {% else %}
+      <span class="jc-title">{{ title }}</span>
+    {% endif %}
+  </div>
+
+  {# Row 3: Compact metadata #}
+  <div class="jc-meta">
+    {% if source_value %}<span>{{ source_value }}</span><span class="jc-sep">·</span>{% endif %}
+    {% if suggested_value %}<span style="color:var(--green);">{{ suggested_value }}</span><span class="jc-sep">·</span>{% endif %}
+    {% if flagged_at %}<span>{{ flagged_at[:10] }}</span>{% endif %}
+  </div>
+
+</article>

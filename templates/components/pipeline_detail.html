@@ -1,0 +1,322 @@
+{# Pipeline detail panel -- loaded via HTMX into #pipeline-detail-panel #}
+{% set org_id = item.get('org_id', item.get('opportunity_id', '')) %}
+{% set org_name_raw = item.get('org_name', '') or 'Unknown' %}
+{% set org_name = org_name_raw | smart_org %}
+{% set score = item.get('total_score') or item.get('score', 0) or 0 %}
+{% set frame = item.get('primary_frame', '') or '' %}
+{% set status = item.get('status', 'new') %}
+{% set cause = item.get('cause_area', '') or '' %}
+{% set location = item.get('location', '') or '' %}
+{% set income_band = item.get('income_band', '') or '' %}
+{% set website = item.get('website_url', '') or item.get('website', '') or '' %}
+{% set charity_number_ew = item.get('charity_number_ew', '') or '' %}
+{% set region = item.get('address_region', '') or location %}
+
+{# Score band logic #}
+{% set _score_val = score|float if score else 0 %}
+{% if _score_val >= 60 %}
+  {% set score_pill_cls = "score-pill-hot" %}
+  {% set band_label = "Hot" %}
+{% elif _score_val >= 20 %}
+  {% set score_pill_cls = "score-pill-warm" %}
+  {% set band_label = "Warm" %}
+{% elif _score_val > 0 %}
+  {% set score_pill_cls = "score-pill-monitoring" %}
+  {% set band_label = "Watch" %}
+{% else %}
+  {% set score_pill_cls = "" %}
+  {% set band_label = "" %}
+{% endif %}
+
+{# Income formatting #}
+{% set _inc_raw = item.get('latest_total_gross_income', 0) %}
+{% set _inc = _inc_raw|float if _inc_raw and _inc_raw|string not in ('','nan','None') else 0 %}
+{% if _inc >= 1000000 %}
+  {% set inc_str = "&pound;%.1fm"|format(_inc / 1000000) %}
+{% elif _inc >= 1000 %}
+  {% set inc_str = "&pound;%.0fk"|format(_inc / 1000) %}
+{% else %}
+  {% set inc_str = income_band %}
+{% endif %}
+
+<div class="detail-card">
+
+  {# -- ORG HEADER + SCORE -- #}
+  <div class="jd-org-header">
+    {% if website %}
+    <img src="https://www.google.com/s2/favicons?domain={{ website | domain_only }}&sz=64"
+         alt="" class="ds-icon-tile"
+         onerror="this.outerHTML='<div class=\'ds-icon-tile\'>{{ org_name[:1] }}</div>'">
+    {% else %}
+    <div class="ds-icon-tile">{{ org_name[:1] }}</div>
+    {% endif %}
+    <div class="jd-org-body">
+      <div class="jd-org-name">
+        <a href="/org/{{ org_id }}">{{ org_name | smart_org }}</a>
+      </div>
+      <div class="jd-org-meta">
+        {% if cause %}{{ cause }}{% endif %}{% if inc_str %} &middot; {{ inc_str }}{% endif %}{% if region %} &middot; {{ region }}{% endif %}
+      </div>
+    </div>
+    {% if _score_val > 0 %}
+    <div class="jd-score-right" title="{{ item | score_tooltip }}">
+      <div class="score-display">
+        <span class="score-display-number">{{ _score_val|round(0)|int }}</span>
+        <span class="score-pill {{ score_pill_cls }}">{{ band_label }}</span>
+      </div>
+      {% if item.get('score_explanation') %}
+      <div class="score-display-explain">{{ item['score_explanation'] }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# -- Frame badge -- #}
+  {% if frame == 'bleeding_neck' %}
+  <div class="pd-frame-wrap">
+    <span class="badge badge-bn">Distress signal</span>
+  </div>
+  {% elif frame == 'fresh_wallet' %}
+  <div class="pd-frame-wrap">
+    <span class="badge badge-fw">Growth signal</span>
+  </div>
+  {% endif %}
+
+  {# -- Warm path -- #}
+  {% if item.get('has_warm_path') %}
+  <div class="warm-path-banner pd-frame-wrap">
+    &#9733; You know <strong>{{ item.get('warm_path_contact', '') }}</strong>
+  </div>
+  {% endif %}
+
+  {# -- Pitch & Why Now -- #}
+  {% if item.get('pitch_angle') or item.get('why_now') %}
+  <div class="ds-label">Key Intelligence</div>
+  {% if item.get('pitch_angle') %}
+  <div class="insight-box">
+    <div class="insight-box-title">Pitch Angle</div>
+    <div class="insight-box-body">{{ item['pitch_angle'] | extract_bullet }}</div>
+  </div>
+  {% endif %}
+  {% if item.get('why_now') %}
+  <div class="insight-box">
+    <div class="insight-box-title">Why Now</div>
+    <div class="insight-box-body">{{ item['why_now'] | extract_bullet }}</div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {# -- Signals -- #}
+  {% set signals_raw = item.get('top_signal_ids', '[]') or '[]' %}
+  {% set signals = signals_raw | fromjson if signals_raw is string else signals_raw %}
+  {% if signals %}
+  <div class="ds-label">Signals</div>
+  <div class="jd-badge-row">
+    {% for sig in signals %}
+      {% if sig %}
+      <span class="badge badge-monitor">{{ trigger_display_names.get(sig, sig | replace('_', ' ') | title) }}</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# -- Score Breakdown -- #}
+  {% set fin_sub = item.get('financial_subscore', 0) %}
+  {% set work_sub = item.get('workforce_subscore', 0) %}
+  {% set digi_sub = item.get('digital_subscore', 0) %}
+  {% set gov_sub = item.get('governance_subscore', 0) %}
+  {% set del_sub = item.get('delivery_subscore', 0) %}
+  {% set _fin = fin_sub|float if fin_sub and fin_sub|string not in ('','nan','None') else 0 %}
+  {% set _work = work_sub|float if work_sub and work_sub|string not in ('','nan','None') else 0 %}
+  {% set _digi = digi_sub|float if digi_sub and digi_sub|string not in ('','nan','None') else 0 %}
+  {% set _gov = gov_sub|float if gov_sub and gov_sub|string not in ('','nan','None') else 0 %}
+  {% set _del = del_sub|float if del_sub and del_sub|string not in ('','nan','None') else 0 %}
+  {% if _fin > 0 or _work > 0 or _digi > 0 or _gov > 0 or _del > 0 %}
+  <div class="ds-label">Score Breakdown</div>
+  <div class="jd-badge-row">
+    {% if _fin > 0 %}<span class="badge badge-monitor">Financial: {{ _fin|round(0)|int }}</span>{% endif %}
+    {% if _work > 0 %}<span class="badge badge-monitor">Workforce: {{ _work|round(0)|int }}</span>{% endif %}
+    {% if _digi > 0 %}<span class="badge badge-monitor">Digital: {{ _digi|round(0)|int }}</span>{% endif %}
+    {% if _gov > 0 %}<span class="badge badge-monitor">Governance: {{ _gov|round(0)|int }}</span>{% endif %}
+    {% if _del > 0 %}<span class="badge badge-monitor">Delivery: {{ _del|round(0)|int }}</span>{% endif %}
+  </div>
+  {% endif %}
+
+  {# -- Funding Model -- #}
+  {% set fm = item.get('primary_funding_model', '') or '' %}
+  {% if fm and fm != 'Unknown' %}
+  <div class="ds-label">Funding Model</div>
+  <div class="jd-badge-row">
+    <span class="fm-badge fm-{{ fm|lower|replace('/','-')|replace(' ','-') }}"
+          title="Streams: {{ (item.get('funding_summary','') or '')|replace(',', ', ') }}">{{ fm }}</span>
+  </div>
+  {% endif %}
+
+  {# -- Quick Links — matches the three action buttons on the card. Website
+       and Register are kept as secondary pills because they're distinct from
+       the primary triad (Report / Loxo / LinkedIn).
+       item.linkedin_url now comes via the LEFT JOIN in list_opportunities,
+       so there's no need for a separate master-row fallback here. #}
+  {% set _detail_li_url = item.get('linkedin_url') or '' %}
+  {% if not _detail_li_url %}
+    {% set _detail_li_url = 'https://www.linkedin.com/search/results/companies/?keywords=' ~ (org_name | urlencode) %}
+  {% endif %}
+  <div class="ds-label">Quick Links</div>
+  <div class="link-row">
+    <a href="/org/{{ org_id }}" target="_blank" rel="noopener" class="link-pill">Report</a>
+    <a href="https://fern-talent.app.loxo.co/agencies/40830/companies?query={{ org_name | urlencode }}"
+       target="_blank" rel="noopener" class="link-pill" title="Open in Loxo CRM">Loxo</a>
+    <a href="{{ _detail_li_url }}" target="_blank" rel="noopener" class="link-pill">LinkedIn</a>
+    {% if website and website|string not in ('', 'nan', 'None') %}
+    <a href="{{ website }}" target="_blank" rel="noopener" class="link-pill">Website</a>
+    {% endif %}
+    {% if charity_number_ew and charity_number_ew|string|trim not in ("", "nan", "None") %}
+    <a href="https://register-of-charities.charitycommission.gov.uk/charity-details/?regId={{ charity_number_ew|string|trim|replace('.0','') }}"
+       target="_blank" rel="noopener" class="link-pill">Register</a>
+    {% endif %}
+  </div>
+
+  {# -- Claim / Skip actions --
+       Claim = mark an org as being worked by Tim or Rory (prevents
+       double outreach). Skip = soft-dismiss for 7 days. Both target the
+       card in the list (#card-{org_id}) with outerHTML so the action
+       actually clears the item from the triage queue. The server also
+       fires `pipelineTriaged`, which pipeline.html uses to advance the
+       detail panel and pull in the next opportunity. #}
+  <div class="pd-actions-wrap">
+    {% if item.get('claimed_by') %}
+      <span class="badge-claimed">Claimed by {{ item.get('claimed_by') }}</span>
+    {% else %}
+      <div class="jd-actions-row">
+        <details class="jc-dropdown">
+          <summary class="jd-claim-btn" role="button" title="Mark this organisation as being worked by Tim or Rory so you don't double up on outreach.">&#10003; Claim</summary>
+          <ul>
+            <li><button type="button"
+                   hx-post="/api/triage/{{ org_id }}/claim"
+                   hx-vals='{"claimed_by": "Tim"}'
+                   hx-target="#card-{{ org_id }}" hx-swap="outerHTML"
+                   hx-on::after-request="this.closest('details').open=false">Assign to Tim</button></li>
+            <li><button type="button"
+                   hx-post="/api/triage/{{ org_id }}/claim"
+                   hx-vals='{"claimed_by": "Rory"}'
+                   hx-target="#card-{{ org_id }}" hx-swap="outerHTML"
+                   hx-on::after-request="this.closest('details').open=false">Assign to Rory</button></li>
+          </ul>
+        </details>
+        <button class="jd-skip-btn"
+                hx-post="/api/triage/{{ org_id }}/skip"
+                hx-vals='{"reason": "skipped"}'
+                hx-target="#card-{{ org_id }}"
+                hx-swap="outerHTML">
+          &#10005; Skip
+        </button>
+      </div>
+    {% endif %}
+  </div>
+
+  {# -- Outreach section — always rendered, framed explicitly as "Outreach"
+       so the user never has to guess where the Draft buttons live.
+       When contacts exist: each row has a Draft button per contact.
+       When contacts are empty: a clear callout with "Enrich now" +
+       Loxo search links so the consultant has a one-click recovery. #}
+  <div class="ds-label pd-section-gap">Outreach{% if contacts %}<span class="pd-count-hint">({{ contacts | length }} contact{{ 's' if contacts|length != 1 else '' }})</span>{% endif %}</div>
+  {% if contacts %}
+  <div class="ds-stack-2 ds-mt-2">
+    {% for c in contacts %}
+    {% set _lc = c.get('last_contacted_at') %}
+    {% set _lc_str = _lc | format_last_contacted if _lc else 'Never' %}
+    {% if 'Today' in _lc_str or 'day' in _lc_str or 'week' in _lc_str %}
+      {% set _lc_class = 'pd-last-contact--recent' %}
+    {% elif 'month' in _lc_str %}
+      {% set _lc_class = 'pd-last-contact--mid' %}
+    {% else %}
+      {% set _lc_class = 'pd-last-contact--old' %}
+    {% endif %}
+    <div class="pd-contact-wrap">
+      <div class="pd-contact-row">
+        <div class="ds-grow">
+          <div class="ds-strong">{{ c.get('name', '') }}</div>
+          <div class="pd-contact-role">{{ c.get('role_title', '') or '' }}</div>
+        </div>
+        <span class="pd-last-contact {{ _lc_class }}"
+              title="Last outreach via email / linkedin / phone / meeting">
+          {{ _lc_str }}
+        </span>
+        {% if c.get('email') and c.get('contact_id') %}
+        <button type="button"
+                class="pd-draft-btn"
+                hx-get="/api/outreach/draft-form/{{ c.contact_id }}"
+                hx-target="next .outreach-drawer-slot"
+                hx-swap="innerHTML"
+                title="Draft an outreach email via Claude Haiku">
+          &#9993; Draft email
+        </button>
+        {% else %}
+        <span class="pd-no-email" title="No email on file — enrichment needed">no email</span>
+        {% endif %}
+      </div>
+      {# Per-contact action row — Enrich (30-day cooldown) + View on LinkedIn.
+         Same component used on the dossier Contacts panel. Relies on
+         get_unified_contacts_for_org populating the cooldown fields on each
+         row. #}
+      {% if c.get('contact_id') %}
+      {% with
+          contact_id=c.get('contact_id'),
+          linkedin_url=c.get('linkedin_url'),
+          enrichment_locked=c.get('enrichment_locked', False),
+          days_until_unlock=c.get('days_until_unlock', 0),
+          last_enriched_display=c.get('last_enriched_display', ''),
+          resolved_email=None,
+          lookup_note=None
+      %}
+        {% include "components/contact_actions.html" %}
+      {% endwith %}
+      {% endif %}
+      <div class="outreach-drawer-slot"></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="pd-empty-callout">
+    <div class="pd-empty-intro">
+      <strong>Add contacts first to draft outreach emails.</strong>
+      No contacts on file for this organisation yet — Derrick can pull the CEO / Head of Fundraising from LinkedIn in about two minutes.
+    </div>
+    <div class="pd-empty-actions">
+      <button type="button"
+              class="pd-enrich-btn"
+              hx-post="/api/internal/enrich-contacts-one"
+              hx-vals='{"org_id": "{{ org_id }}"}'
+              hx-swap="none"
+              hx-on::after-request="this.textContent = 'Enriching — refresh in 2 min'; this.disabled = true; this.classList.add('is-pending');"
+              title="Queue a Derrick enrichment run for this org (runs in background, ~2 min)">
+        Enrich now
+      </button>
+      <a href="https://fern-talent.app.loxo.co/agencies/40830/people?query={{ (item.get('org_name') or '') | urlencode }}"
+         target="_blank" rel="noopener"
+         class="pd-alt-link">
+        Or search Loxo &rarr;
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {# -- Phase 5: Outreach history (chronological, read-only) -- #}
+  {% if outreach_history %}
+  <div class="ds-label pd-section-gap">Outreach history</div>
+  <div class="ds-stack-1 ds-mt-2">
+    {% for ev in outreach_history %}
+    <div class="pd-history-row">
+      <span class="pd-history-date ds-num">{{ (ev.get('sent_at') or '')[:10] }}</span>
+      <span class="pd-history-contact">{{ ev.get('contact_name') or ev.get('contact_id') or '—' }}</span>
+      <span class="ds-grow ds-truncate" title="{{ ev.get('subject') or '' }}">{{ ev.get('subject') or '(no subject)' }}</span>
+      <span class="pd-history-method">{{ ev.get('method') or 'email' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif contacts %}
+  <div class="ds-label pd-section-gap">Outreach history</div>
+  <div class="pd-history-empty">No outreach yet.</div>
+  {% endif %}
+
+</div>

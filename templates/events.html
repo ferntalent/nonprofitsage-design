@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}Events, Anniversaries & Capital Appeals — NonprofitSage.ai{% endblock %}
+{% block content %}
+
+<style>
+  .ev-stats { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .ev-stat { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.75rem 1rem; flex: 1; min-width: 140px; text-align: center; }
+  .ev-stat-num { font-size: 1.5rem; font-weight: 800; font-family: 'Open Sans', sans-serif; }
+  .ev-stat-num.navy { color: var(--navy); }
+  .ev-stat-num.pink { color: #FF4FBE; }
+  .ev-stat-num.steel { color: #5b7fc4; }
+  .ev-stat-num.amber { color: #d97706; }
+  .ev-stat-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-top: 0.15rem; }
+
+  .ev-pending-banner { background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; }
+  .ev-pending-title { font-weight: 700; font-size: 0.9rem; color: #92400e; margin-bottom: 0.5rem; }
+  .ev-pending-card { background: #fff; border: 1px solid #fde68a; border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.75rem; }
+  .ev-pending-info { flex: 1; min-width: 0; }
+  .ev-pending-headline { font-size: 0.82rem; font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev-pending-meta { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem; }
+  .ev-pending-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+  .ev-pending-btn { border: none; border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; font-family: 'Open Sans', sans-serif; }
+  .ev-pending-btn.approve { background: #dcfce7; color: #166534; }
+  .ev-pending-btn.approve:hover { background: #bbf7d0; }
+  .ev-pending-btn.dismiss { background: #fee2e2; color: #991b1b; }
+  .ev-pending-btn.dismiss:hover { background: #fecaca; }
+
+  .ev-filters { margin-bottom: 1rem; }
+  .ev-filter-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
+  .ev-filter-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); min-width: 70px; }
+  .ev-search { border: 1.5px solid #ddd; border-radius: 999px; padding: 0.25rem 0.7rem; font-size: 0.75rem; font-weight: 600; font-family: 'Open Sans', sans-serif; outline: none; width: 180px; }
+  .ev-search:focus { border-color: #FF4FBE; }
+
+  .ev-card { position: relative; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e1; border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 4px; transition: box-shadow 0.12s; }
+  .ev-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .ev-card.roi-veryhigh { border-left-color: #FF4FBE; }
+  .ev-card.roi-high { border-left-color: #5b7fc4; }
+  .ev-card.roi-medium { border-left-color: #94a3b8; }
+  .ev-card.roi-low { border-left-color: #ddd; }
+  .ev-card.ms-centenary { border-left-color: #d4af37; }
+  .ev-card.ms-gold { border-left-color: #5b7fc4; }
+  .ev-card.ms-silver { border-left-color: #94a3b8; }
+  .ev-card.ms-diamond { border-left-color: #b9f2ff; }
+  .ev-card.ms-platinum { border-left-color: #e5e4e2; }
+  .ev-card.ms-ruby { border-left-color: #e0115f; }
+
+  .ev-org-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem; }
+  .ev-favicon { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; }
+  .ev-favicon-fb { width: 20px; height: 20px; border-radius: 4px; background: #e8ecf0; color: #5a6b7d; font-size: 9px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ev-org-name { font-weight: 700; font-size: 0.85rem; color: var(--navy); text-decoration: none; }
+  .ev-org-name:hover { color: #FF4FBE; }
+  .ev-badge { display: inline-block; font-size: 0.58rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; vertical-align: middle; font-family: 'Open Sans', sans-serif; margin-left: auto; }
+  .ev-badge-roi-veryhigh { background: #fce7f3; color: #be185d; }
+  .ev-badge-roi-high { background: #dbeafe; color: #1565c0; }
+  .ev-badge-roi-medium { background: #f1f5f9; color: #475569; }
+  .ev-badge-roi-low { background: #f8fafc; color: #94a3b8; }
+  .ev-badge-ms-centenary { background: #fef3c7; color: #92400e; }
+  .ev-badge-ms-historic { background: #fef3c7; color: #92400e; }
+  .ev-badge-ms-bicentenary { background: #fef3c7; color: #92400e; }
+  .ev-badge-ms-gold { background: #dbeafe; color: #1565c0; }
+  .ev-badge-ms-diamond { background: #e0f2fe; color: #0369a1; }
+  .ev-badge-ms-platinum { background: #f1f5f9; color: #475569; }
+  .ev-badge-ms-ruby { background: #fce7f3; color: #9d174d; }
+  .ev-badge-ms-silver { background: #f1f5f9; color: #475569; }
+  .ev-badge-ms-minor { background: #f8fafc; color: #94a3b8; }
+
+  .ev-title { font-size: 0.82rem; font-weight: 600; color: #334155; }
+  .ev-meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem; }
+  .ev-meta .sep { margin: 0 0.3rem; }
+  .ev-actions { display: flex; gap: 0.5rem; margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px solid #f1f5f9; }
+  .ev-act { font-size: 0.7rem; font-weight: 600; color: #5b7fc4; text-decoration: none; padding: 2px 0; }
+  .ev-act:hover { color: #FF4FBE; }
+
+  .ev-add-form { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-top: 0.75rem; }
+  .ev-add-form label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #5a6b7d; margin-bottom: 0.2rem; margin-top: 0.5rem; }
+  .ev-add-form input, .ev-add-form select, .ev-add-form textarea { width: 100%; box-sizing: border-box; }
+  .ev-add-form .ev-add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .ev-add-submit { margin-top: 0.75rem; background: var(--navy); color: #fff; border: none; border-radius: 6px; padding: 0.45rem 1.2rem; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: 'Open Sans', sans-serif; }
+  .ev-add-submit:hover { background: #1a3347; }
+
+  .ev-empty { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem; }
+
+  /* Type badges on pending cards */
+  .ev-type-badge { display: inline-block; font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 3px; background: #eee; margin-right: 0.3rem; vertical-align: middle; }
+
+  /* Readiness score badge on cards */
+  .ev-readiness-badge { display: inline-block; font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 3px; margin-left: 0.4rem; }
+  .ev-rs-hot { background: #FF4FBE; color: #fff; }
+  .ev-rs-warm { background: #e8a735; color: #fff; }
+  .ev-rs-cool { background: #ccc; color: var(--text-secondary); }
+
+  /* Readiness bar at card bottom */
+  .ev-readiness-bar { height: 3px; background: #eee; border-radius: 2px; margin-top: 0.5rem; overflow: hidden; }
+  .ev-readiness-bar > div { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #e8a735, #FF4FBE); }
+
+  /* Loxo contacts row */
+  .ev-loxo-row { font-size: 0.72rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.3rem; padding-top: 0.3rem; border-top: 1px solid #f0f0f0; }
+  .ev-loxo-row .vacant { color: #c44; font-weight: 600; }
+
+  /* Pitch button */
+  .ev-pitch-btn { background: #5b7fc4; color: #fff !important; border: none; padding: 0.25rem 0.6rem; border-radius: 3px; font-size: 0.72rem; cursor: pointer; font-family: 'Open Sans', sans-serif; }
+  .ev-pitch-btn:hover { background: #4a6ab0; color: #fff !important; }
+  .ev-pitch-btn.htmx-request { opacity: 0.6; pointer-events: none; }
+  .ev-pitch-btn.htmx-request::after { content: ' Generating...'; }
+</style>
+
+<style>
+  .ev-tabs { display:flex; gap:0; margin:0.8rem 0 1rem; border-bottom:1.5px solid #e2e8f0; }
+  .ev-tab { padding:0.5rem 1.05rem; font-size:0.8rem; font-weight:700; color:var(--text-muted); text-decoration:none; cursor:pointer; border:none; background:transparent; border-bottom:2.5px solid transparent; margin-bottom:-1.5px; font-family:'Open Sans',sans-serif; }
+  .ev-tab.active { color:var(--navy); border-bottom-color:#FF4FBE; }
+  .ev-tab:hover { color:var(--navy); }
+</style>
+
+<div style="max-width: 900px; margin: 0 auto; padding: 1rem;">
+  <h2 style="font-size: 1.2rem; font-weight: 800; color: var(--navy); margin-bottom: 0.25rem;">Events, Anniversaries & Capital Appeals</h2>
+  <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.25rem;">Upcoming charity galas, fundraising events, milestone anniversaries and capital appeals for 2026+</p>
+
+  <div class="ev-tabs">
+    <button class="ev-tab {% if (current_tab or 'cards') == 'cards' %}active{% endif %}"
+            onclick="window.evSwitchTab('cards');">Event Cards</button>
+    <button class="ev-tab {% if current_tab == 'leads' %}active{% endif %}"
+            onclick="window.evSwitchTab('leads'); if (!document.getElementById('ev-leads-loaded')) { htmx.ajax('GET', '/events/leads', {target:'#ev-leads-pane', swap:'innerHTML'}); }">Leads</button>
+  </div>
+
+  <div id="ev-cards-pane" style="{% if current_tab == 'leads' %}display:none;{% endif %}">
+
+  <!-- Pending Review Banner -->
+  {% if pending %}
+  <div class="ev-pending-banner">
+    <div class="ev-pending-title">{{ pending|length }} event{{ 's' if pending|length != 1 else '' }} spotted in news — review needed</div>
+    {% for p in pending %}
+    <div class="ev-pending-card" id="pending-{{ p.pending_id }}">
+      <div class="ev-pending-info">
+        <div class="ev-pending-headline">
+          <span class="ev-type-badge">{% if p.item_type == 'capital_appeal' %}🏗️ Appeal{% elif p.item_type == 'anniversary' %}🎂 Anniversary{% else %}🎪 Event{% endif %}</span>
+          {{ p.org_name or 'Unknown org' }} — {{ p.suggested_event_name or p.news_headline }}
+        </div>
+        <div class="ev-pending-meta">{{ p.news_source or 'News' }} · {{ p.detected_date[:10] if p.detected_date else '' }}{% if p.item_type == 'capital_appeal' and p.suggested_target_amount %} · Target: {{ p.suggested_target_amount }}{% endif %}</div>
+      </div>
+      <div class="ev-pending-actions">
+        <button class="ev-pending-btn approve"
+                hx-post="/events/review/approve"
+                hx-vals='{"pending_id": "{{ p.pending_id }}"}'
+                hx-target="#pending-{{ p.pending_id }}"
+                hx-swap="outerHTML">Approve</button>
+        <button class="ev-pending-btn dismiss"
+                hx-post="/events/review/dismiss"
+                hx-vals='{"pending_id": "{{ p.pending_id }}"}'
+                hx-target="#pending-{{ p.pending_id }}"
+                hx-swap="outerHTML">Dismiss</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Stats -->
+  <div class="ev-stats">
+    <div class="ev-stat">
+      <div class="ev-stat-num navy">{{ events_count }}</div>
+      <div class="ev-stat-label">Upcoming Events</div>
+    </div>
+    <div class="ev-stat">
+      <div class="ev-stat-num steel">{{ anniversaries_count }}</div>
+      <div class="ev-stat-label">Milestones in 2026</div>
+    </div>
+    <div class="ev-stat">
+      <div class="ev-stat-num pink">{{ capital_count }}</div>
+      <div class="ev-stat-label">Capital Appeals</div>
+    </div>
+    {% if pending_count > 0 %}
+    <div class="ev-stat">
+      <div class="ev-stat-num amber">{{ pending_count }}</div>
+      <div class="ev-stat-label">Pending Review</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Filters -->
+  <form class="ev-filters" hx-get="/events/cards" hx-target="#events-grid" hx-swap="innerHTML" hx-trigger="change, submit" hx-include="this">
+    <div class="ev-filter-row">
+      <span class="ev-filter-label">Type</span>
+      <button type="button" class="jpill {% if current_type == 'all' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=type]').value='all';this.closest('form').requestSubmit();"><span>All</span></button>
+      <button type="button" class="jpill {% if current_type == 'events' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=type]').value='events';this.closest('form').requestSubmit();"><span>Events</span></button>
+      <button type="button" class="jpill {% if current_type == 'anniversaries' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=type]').value='anniversaries';this.closest('form').requestSubmit();"><span>Anniversaries</span></button>
+      <button type="button" class="jpill {% if current_type == 'capital_appeals' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=type]').value='capital_appeals';this.closest('form').requestSubmit();"><span>Capital Appeals</span></button>
+      <input type="hidden" name="type" value="{{ current_type }}">
+    </div>
+    <div class="ev-filter-row">
+      <span class="ev-filter-label">ROI</span>
+      <button type="button" class="jpill {% if not current_roi %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=roi]').value='';this.closest('form').requestSubmit();"><span>All</span></button>
+      <button type="button" class="jpill {% if current_roi == 'Very High' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=roi]').value='Very High';this.closest('form').requestSubmit();"><span>Very High</span></button>
+      <button type="button" class="jpill {% if current_roi == 'High' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=roi]').value='High';this.closest('form').requestSubmit();"><span>High</span></button>
+      <button type="button" class="jpill {% if current_roi == 'Medium' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=roi]').value='Medium';this.closest('form').requestSubmit();"><span>Medium</span></button>
+      <button type="button" class="jpill {% if current_roi == 'Low' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=roi]').value='Low';this.closest('form').requestSubmit();"><span>Low</span></button>
+      <input type="hidden" name="roi" value="{{ current_roi }}">
+    </div>
+    <div class="ev-filter-row">
+      <span class="ev-filter-label">Milestone</span>
+      <button type="button" class="jpill {% if not current_milestone %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=milestone]').value='';this.closest('form').requestSubmit();"><span>All</span></button>
+      <button type="button" class="jpill {% if current_milestone == 'centenary' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=milestone]').value='centenary';this.closest('form').requestSubmit();"><span>Centenary+</span></button>
+      <button type="button" class="jpill {% if current_milestone == 'gold' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=milestone]').value='gold';this.closest('form').requestSubmit();"><span>Gold (50)</span></button>
+      <button type="button" class="jpill {% if current_milestone == 'silver' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=milestone]').value='silver';this.closest('form').requestSubmit();"><span>Silver (25)</span></button>
+      <input type="hidden" name="milestone" value="{{ current_milestone }}">
+    </div>
+    <div class="ev-filter-row">
+      <span class="ev-filter-label">Readiness</span>
+      <button type="button" class="jpill {% if not current_readiness %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=readiness]').value='';this.closest('form').requestSubmit();"><span>All</span></button>
+      <button type="button" class="jpill {% if current_readiness == 'hot' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=readiness]').value='hot';this.closest('form').requestSubmit();" {% if current_readiness == 'hot' %}style="background:#FF4FBE;color:#fff"{% endif %}><span>🔥 Hot Leads</span></button>
+      <button type="button" class="jpill {% if current_readiness == 'warm' %}active{% endif %}" onclick="this.parentElement.querySelector('input[name=readiness]').value='warm';this.closest('form').requestSubmit();" {% if current_readiness == 'warm' %}style="background:#e8a735;color:#fff"{% endif %}><span>Warm</span></button>
+      <input type="hidden" name="readiness" value="{{ current_readiness }}">
+    </div>
+    <div class="ev-filter-row">
+      <span class="ev-filter-label">Search</span>
+      <input type="text" name="q" value="{{ current_q }}" class="ev-search" placeholder="Org or event name..." hx-trigger="keyup changed delay:300ms" hx-get="/events/cards" hx-target="#events-grid" hx-swap="innerHTML" hx-include="closest form">
+    </div>
+  </form>
+
+  <!-- Card Grid -->
+  <div id="events-grid">
+    {% include "components/event_card_list.html" %}
+  </div>
+
+  <!-- Manual Add Form -->
+  <details style="margin-top: 1.5rem;">
+    <summary style="cursor:pointer;font-weight:700;font-size:0.85rem;color:var(--navy);list-style:none;">+ Add event manually</summary>
+    <form class="ev-add-form" method="post" action="/events/add">
+      <div class="ev-add-row">
+        <div>
+          <label>Organisation Name</label>
+          <input type="text" name="org_name" required placeholder="e.g. NSPCC">
+        </div>
+        <div>
+          <label>Event Name</label>
+          <input type="text" name="event_name" placeholder="e.g. Annual Gala Dinner">
+        </div>
+      </div>
+      <div class="ev-add-row">
+        <div>
+          <label>Date</label>
+          <input type="date" name="event_date">
+        </div>
+        <div>
+          <label>Location</label>
+          <input type="text" name="location" placeholder="e.g. Natural History Museum">
+        </div>
+      </div>
+      <div class="ev-add-row">
+        <div>
+          <label>ROI Estimate</label>
+          <select name="est_roi">
+            <option value="Very High">Very High</option>
+            <option value="High">High</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div>
+          <label>Type</label>
+          <div style="display:flex;gap:1rem;padding-top:0.3rem;">
+            <label style="display:inline;font-size:0.8rem;text-transform:none;letter-spacing:0;"><input type="radio" name="item_type" value="event" checked> Event</label>
+            <label style="display:inline;font-size:0.8rem;text-transform:none;letter-spacing:0;"><input type="radio" name="item_type" value="anniversary"> Anniversary</label>
+            <label style="display:inline;font-size:0.8rem;text-transform:none;letter-spacing:0;"><input type="radio" name="item_type" value="capital_appeal"> Capital Appeal</label>
+          </div>
+        </div>
+      </div>
+      <div class="ev-add-row">
+        <div>
+          <label>Year Established <span style="font-weight:400;text-transform:none;">(anniversaries only)</span></label>
+          <input type="number" name="year_established" value="0" min="1500" max="2026" placeholder="e.g. 1976">
+        </div>
+        <div>
+          <label>Notes / Source URL</label>
+          <input type="text" name="notes" placeholder="Optional notes or source link">
+        </div>
+      </div>
+      <div class="ev-add-row">
+        <div>
+          <label>Target Amount <span style="font-weight:400;text-transform:none;">(capital appeals only)</span></label>
+          <input type="text" name="target_amount" placeholder="e.g. £20m">
+        </div>
+        <div>
+          <label>Campaign Description <span style="font-weight:400;text-transform:none;">(capital appeals only)</span></label>
+          <textarea name="campaign_description" placeholder="Brief description of the appeal..." rows="2" style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <button type="submit" class="ev-add-submit">Add Event</button>
+    </form>
+  </details>
+  </div> <!-- /ev-cards-pane -->
+
+  <div id="ev-leads-pane" style="{% if current_tab != 'leads' %}display:none;{% endif %}">
+    {% if current_tab == 'leads' %}
+      {% include "components/events_leads.html" %}
+      <span id="ev-leads-loaded" style="display:none;"></span>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+window.evSwitchTab = function(name) {
+  document.getElementById('ev-cards-pane').style.display = (name === 'cards') ? '' : 'none';
+  document.getElementById('ev-leads-pane').style.display = (name === 'leads') ? '' : 'none';
+  document.querySelectorAll('.ev-tab').forEach(function(t){ t.classList.remove('active'); });
+  (event && event.currentTarget) && event.currentTarget.classList.add('active');
+  try { history.replaceState(null, '', '/events' + (name === 'leads' ? '?tab=leads' : '')); } catch(e) {}
+};
+</script>
+
+{% endblock %}

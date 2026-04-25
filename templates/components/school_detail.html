@@ -1,0 +1,159 @@
+{# School detail panel -- loaded via HTMX into #school-detail-panel #}
+{% set org_id = item.get('org_id', '') %}
+{% set org_name_raw = item.get('org_name', '') or 'Unknown' %}
+{% set org_name = org_name_raw | smart_org %}
+{% set score = item.get('total_score') %}
+{% set score_band_val = item.get('score_band', '') %}
+{% set school_type = item.get('school_type', '') %}
+{% set is_independent = item.get('is_independent_school', false) %}
+{% set is_state = item.get('is_state_school', false) %}
+{% set income = item.get('latest_total_gross_income', 0) %}
+{% set expenditure = item.get('latest_total_gross_expenditure', 0) %}
+{% set postcode = item.get('address_postcode', '') %}
+{% set region = item.get('address_region', '') %}
+{% set website = item.get('website', '') %}
+{% set charity_number_ew = item.get('charity_number_ew', '') %}
+{% set classifications_raw = item.get('classifications', '') %}
+{% set address_full = item.get('address_full', '') %}
+{% set volunteers = item.get('latest_volunteer_count', '') %}
+{% set fin_period = item.get('latest_fin_period_end_date', '') %}
+
+{# Parse cause area from classifications #}
+{% set cause_area = '' %}
+{% if classifications_raw and classifications_raw|string not in ('', '[]', 'nan', 'None') %}
+  {% set cause_area = classifications_raw|string %}
+{% endif %}
+
+{# Determine school type label #}
+{% if school_type %}
+  {% set type_label = school_type %}
+{% elif is_independent %}
+  {% set type_label = 'Independent School' %}
+{% elif is_state %}
+  {% set type_label = 'State School' %}
+{% else %}
+  {% set type_label = 'School' %}
+{% endif %}
+
+{# Score band logic #}
+{% set _score_val = score|float if score else 0 %}
+{% if _score_val >= 60 %}
+  {% set score_pill_cls = "score-pill-hot" %}
+  {% set band_label = "Hot" %}
+{% elif _score_val >= 20 %}
+  {% set score_pill_cls = "score-pill-warm" %}
+  {% set band_label = "Warm" %}
+{% elif _score_val > 0 %}
+  {% set score_pill_cls = "score-pill-monitoring" %}
+  {% set band_label = "Watch" %}
+{% else %}
+  {% set score_pill_cls = "" %}
+  {% set band_label = "" %}
+{% endif %}
+
+{# Income formatting #}
+{% set _inc = income|float if income and income|string not in ('','nan','None') else 0 %}
+{% if _inc >= 1000000 %}
+  {% set inc_str = "&pound;%.1fm"|format(_inc / 1000000) %}
+{% elif _inc >= 1000 %}
+  {% set inc_str = "&pound;%.0fk"|format(_inc / 1000) %}
+{% else %}
+  {% set inc_str = "" %}
+{% endif %}
+
+{% set _exp = expenditure|float if expenditure and expenditure|string not in ('','nan','None') else 0 %}
+{% if _exp >= 1000000 %}
+  {% set exp_str = "&pound;%.1fm"|format(_exp / 1000000) %}
+{% elif _exp >= 1000 %}
+  {% set exp_str = "&pound;%.0fk"|format(_exp / 1000) %}
+{% else %}
+  {% set exp_str = "" %}
+{% endif %}
+
+<div class="detail-card">
+
+  {# -- ORG HEADER + SCORE -- #}
+  <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px;">
+    {% if website %}
+    <img src="https://www.google.com/s2/favicons?domain={{ website|replace('https://','')|replace('http://','') }}&sz=64"
+         alt="" style="width:40px;height:40px;border-radius:8px;flex-shrink:0;" onerror="this.outerHTML='<div style=\'width:40px;height:40px;border-radius:8px;background:var(--steel-soft);color:var(--steel);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0\'>{{ org_name[:1] }}</div>'">
+    {% else %}
+    <div style="width:40px;height:40px;border-radius:8px;background:var(--steel-soft);color:var(--steel);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;">{{ org_name[:1] }}</div>
+    {% endif %}
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:18px;font-weight:700;color:var(--navy);line-height:1.3;">
+        {% if org_id %}<a href="/org/{{ org_id }}" style="color:var(--navy);text-decoration:none;">{{ org_name | smart_org }}</a>{% else %}{{ org_name | smart_org }}{% endif %}
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">
+        {% if type_label %}{{ type_label }}{% endif %}{% if inc_str %} &middot; {{ inc_str }}{% endif %}{% if region %} &middot; {{ region }}{% endif %}
+      </div>
+    </div>
+    {% if _score_val > 0 %}
+    <div style="text-align:right;flex-shrink:0;">
+      <div class="score-display">
+        <span class="score-display-number">{{ _score_val|round(0)|int }}</span>
+        <span class="score-pill {{ score_pill_cls }}">{{ band_label }}</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# -- SCHOOL INFO -- #}
+  <div class="ds-label">School Info</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px;">
+    <span class="badge badge-monitor">{{ type_label }}</span>
+    {% if inc_str %}<span class="badge badge-monitor">Income: {{ inc_str }}</span>{% endif %}
+    {% if exp_str %}<span class="badge badge-monitor">Expenditure: {{ exp_str }}</span>{% endif %}
+    {% if region %}<span class="badge badge-monitor">{{ region }}</span>{% endif %}
+    {% if postcode %}<span class="badge badge-monitor">{{ postcode }}</span>{% endif %}
+    {% if volunteers and volunteers|string not in ('', '0', '0.0', 'nan', 'None') %}<span class="badge badge-monitor">{{ volunteers|int }} volunteers</span>{% endif %}
+  </div>
+
+  {% if address_full and address_full|string not in ('', 'nan', 'None') %}
+  <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
+    {{ address_full }}
+  </div>
+  {% endif %}
+
+  {% if fin_period and fin_period|string not in ('', 'nan', 'None') %}
+  <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">
+    Latest financial period: {{ fin_period }}
+  </div>
+  {% endif %}
+
+  {# -- SCORE BREAKDOWN -- #}
+  {% set fin_sub = item.get('financial_subscore', 0) %}
+  {% set work_sub = item.get('workforce_subscore', 0) %}
+  {% set digi_sub = item.get('digital_subscore', 0) %}
+  {% set gov_sub = item.get('governance_subscore', 0) %}
+  {% set del_sub = item.get('delivery_subscore', 0) %}
+  {% set _fin = fin_sub|float if fin_sub and fin_sub|string not in ('','nan','None') else 0 %}
+  {% set _work = work_sub|float if work_sub and work_sub|string not in ('','nan','None') else 0 %}
+  {% set _digi = digi_sub|float if digi_sub and digi_sub|string not in ('','nan','None') else 0 %}
+  {% set _gov = gov_sub|float if gov_sub and gov_sub|string not in ('','nan','None') else 0 %}
+  {% set _del = del_sub|float if del_sub and del_sub|string not in ('','nan','None') else 0 %}
+  {% if _fin > 0 or _work > 0 or _digi > 0 or _gov > 0 or _del > 0 %}
+  <div class="ds-label">Score Breakdown</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;">
+    {% if _fin > 0 %}<span class="badge badge-monitor">Financial: {{ _fin|round(0)|int }}</span>{% endif %}
+    {% if _work > 0 %}<span class="badge badge-monitor">Workforce: {{ _work|round(0)|int }}</span>{% endif %}
+    {% if _digi > 0 %}<span class="badge badge-monitor">Digital: {{ _digi|round(0)|int }}</span>{% endif %}
+    {% if _gov > 0 %}<span class="badge badge-monitor">Governance: {{ _gov|round(0)|int }}</span>{% endif %}
+    {% if _del > 0 %}<span class="badge badge-monitor">Delivery: {{ _del|round(0)|int }}</span>{% endif %}
+  </div>
+  {% endif %}
+
+  {# -- QUICK LINKS -- #}
+  <div class="ds-label">Quick Links</div>
+  <div class="link-row">
+    {% if org_id %}<a href="/org/{{ org_id }}" class="link-pill">Report</a>{% endif %}
+    {% if website and website|string not in ('', 'nan', 'None') %}
+    <a href="{{ website }}" target="_blank" rel="noopener" class="link-pill">Website</a>
+    {% endif %}
+    {% if charity_number_ew and charity_number_ew|string|trim not in ("", "nan", "None") %}
+    <a href="https://register-of-charities.charitycommission.gov.uk/charity-details/?regId={{ charity_number_ew|string|trim|replace('.0','') }}"
+       target="_blank" rel="noopener" class="link-pill">Register</a>
+    {% endif %}
+  </div>
+
+</div>

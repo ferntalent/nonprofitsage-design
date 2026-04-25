@@ -1,0 +1,85 @@
+{# Inline HTMX fragment returned by POST /api/triage/{org_id}/claim
+   and POST /api/triage/{org_id}/reload-contacts.
+   Replaces the whole card via outerHTML swap, so the wrapper <div> must
+   carry the same id="card-{org_id}" the source card used. #}
+<div class="card card-claimed" id="card-{{ org_id }}"
+     style="border-left:3px solid var(--green);background:var(--green-soft);">
+  <div class="claim-status-header" style="display:flex;align-items:center;gap:8px;">
+    <span style="color:var(--green);font-size:16px;font-weight:700;">&#10003;</span>
+    <strong style="color:var(--text-primary);font-size:13px;">
+      Claimed by {{ claimed_by or 'Unknown' }}
+    </strong>
+    <span style="color:var(--text-muted);font-size:11.5px;">
+      {% if contacts_total %}
+        &middot; {{ contacts_total }} contact{{ 's' if contacts_total != 1 else '' }} in Loxo
+      {% else %}
+        &middot; no contacts found in Loxo
+      {% endif %}
+    </span>
+    <span style="flex:1;"></span>
+    <button type="button"
+            class="btn-ghost reload-contacts-btn"
+            style="font-size:10.5px;padding:2px 8px;cursor:pointer;border:1px solid var(--border);background:var(--surface);border-radius:6px;color:var(--text-muted);"
+            hx-post="/api/triage/{{ org_id }}/reload-contacts"
+            hx-vals='{"claimed_by": "{{ claimed_by }}"}'
+            hx-target="#card-{{ org_id }}"
+            hx-swap="outerHTML"
+            hx-indicator="#reload-ind-{{ org_id }}"
+            title="Re-fetch contacts from Loxo for this org">
+      &#8634; Reload
+    </button>
+    <span id="reload-ind-{{ org_id }}" class="htmx-indicator" style="font-size:10.5px;color:var(--text-muted);">loading…</span>
+  </div>
+
+  {% if loxo_result and loxo_result.get('status') == 'error' %}
+  <div style="margin-top:6px;font-size:11px;color:var(--amber);">
+    Loxo fetch had trouble — {{ loxo_result.get('detail', 'unknown error') }}. The claim was still recorded.
+  </div>
+  {% endif %}
+
+  {% if top_contacts %}
+  <div class="claim-contacts" style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+    {% for c in top_contacts %}
+    <div class="claim-contact-wrap">
+      <div class="claim-contact-row" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;color:var(--text-primary);">{{ c.name }}</div>
+          <div style="color:var(--text-muted);font-size:10.5px;">{{ c.role_title }}</div>
+        </div>
+        {% if c.email %}
+        <span class="reveal-email"
+              data-value="{{ c.email }}"
+              style="font-family:'Open Sans',monospace;font-size:11px;color:var(--steel);cursor:pointer;padding:2px 6px;border-radius:4px;background:var(--steel-soft);"
+              title="Click to reveal email">
+          {{ c.email_masked }}
+        </span>
+        {% endif %}
+        <span style="font-size:10.5px;color:var(--text-muted);min-width:80px;text-align:right;">
+          {% if c.last_contacted_at %}
+            {{ c.last_contacted_at | format_last_contacted }}
+          {% else %}
+            Never
+          {% endif %}
+        </span>
+        {% if c.email %}
+        <button type="button"
+                class="btn-primary draft-outreach-btn"
+                style="font-size:10.5px;padding:2px 8px;white-space:nowrap;"
+                hx-get="/api/outreach/draft-form/{{ c.contact_id }}"
+                hx-target="next .outreach-drawer-slot"
+                hx-swap="innerHTML"
+                title="Draft an outreach email via Claude Haiku">
+          &#9993; Draft
+        </button>
+        {% endif %}
+      </div>
+      <div class="outreach-drawer-slot"></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="margin-top:8px;font-size:11.5px;color:var(--text-muted);">
+    No contacts loaded yet — try &#8634; Reload if you know this org is in Loxo.
+  </div>
+  {% endif %}
+</div>

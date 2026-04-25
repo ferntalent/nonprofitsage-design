@@ -1,0 +1,619 @@
+{#
+  Candidate profiling results partial.
+
+  Swapped into #match-results by POST /candidates/analyse. Renders the
+  editable profile card on the left and three lazy-loaded tabs on the
+  right — orgs, prep pack, pitch emails. Each tab fires its own HTMX
+  request on load (not on click) so all three generators run in parallel
+  while the user reads the profile card.
+
+  Context provided by the router:
+    - session: dict with session_id + profile (dict) + matches (dict)
+    - warnings: list[str] — non-fatal issues (e.g. "Haiku unavailable")
+#}
+<style>
+/* One-off styles for the candidate results view. Keeps the partial
+   portable — no cross-template dependencies besides brand.css. */
+.cp-results-wrap {
+  display: grid; grid-template-columns: minmax(320px, 400px) 1fr;
+  gap: 18px; margin-top: 18px;
+}
+@media (max-width: 900px) {
+  .cp-results-wrap { grid-template-columns: 1fr; }
+}
+
+.cp-profile-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 22px 24px; box-shadow: var(--shadow-sm);
+  align-self: start; position: sticky; top: 64px;
+}
+.cp-profile-card h3 {
+  margin: 0 0 4px 0; font-size: 1.25rem; font-weight: 700;
+  color: var(--navy); letter-spacing: -0.01em; line-height: 1.25;
+}
+.cp-profile-card .cp-sub {
+  font-size: 0.78rem; color: var(--text-muted); margin: 0 0 20px 0;
+}
+
+.cp-field { margin-bottom: 16px; }
+.cp-field label {
+  display: block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.7px; color: var(--text-muted); margin-bottom: 5px;
+}
+.cp-field input, .cp-field textarea, .cp-field select {
+  width: 100%; box-sizing: border-box;
+  font-family: 'Open Sans', sans-serif; font-size: 0.88rem;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px;
+  background: var(--surface); color: var(--text-primary);
+  transition: border-color 0.12s, background 0.12s;
+}
+.cp-field input:hover, .cp-field textarea:hover, .cp-field select:hover { border-color: var(--steel); }
+.cp-field input:focus, .cp-field textarea:focus, .cp-field select:focus {
+  outline: none; border-color: var(--pink); background: var(--pink-soft);
+}
+.cp-field textarea { min-height: 72px; resize: vertical; line-height: 1.5; }
+.cp-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Recruiter-sourced notes — distinguish visually from Haiku-extracted
+   profile fields so the recruiter can see at a glance which context was
+   typed by a human vs lifted from the CV. Soft pink fill + left accent. */
+.cp-field-notes {
+  background: var(--pink-soft); border-left: 3px solid var(--pink);
+  padding: 12px 14px 10px 14px; border-radius: 6px;
+  margin: 4px 0 16px 0;
+}
+.cp-field-notes label { color: var(--pink); margin-bottom: 6px; }
+.cp-field-notes textarea { background: var(--surface); }
+
+.cp-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.cp-tag {
+  font-size: 0.75rem; font-weight: 600; padding: 3px 9px; border-radius: 10px;
+  background: var(--steel-soft); color: var(--steel);
+}
+
+.cp-red-flag {
+  font-size: 0.72rem; color: var(--amber); background: var(--amber-soft);
+  border-left: 2px solid var(--amber); padding: 4px 8px; border-radius: 4px;
+  margin-bottom: 3px;
+}
+
+/* Loxo push block at the bottom of the profile card. Button is navy
+   (primary action), status area swaps in on HTMX response. */
+.cp-loxo-block { margin-top: 18px; padding-top: 14px;
+                 border-top: 1px solid var(--border); }
+.cp-loxo-btn {
+  margin-top: 6px; width: 100%;
+  padding: 9px 14px; border-radius: 6px; border: 1.5px solid var(--navy);
+  background: var(--navy); color: white; font-family: 'Open Sans', sans-serif;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer; letter-spacing: 0.1px;
+  transition: background 0.12s, transform 0.05s;
+}
+.cp-loxo-btn:hover:not(:disabled) { background: #1a2f42; }
+.cp-loxo-btn:active { transform: translateY(1px); }
+.cp-loxo-btn:disabled { opacity: 0.55; cursor: progress; }
+.cp-loxo-btn.htmx-request::after {
+  content: ' · saving…'; font-weight: 400; opacity: 0.85;
+}
+.cp-loxo-status {
+  margin-top: 8px; padding: 8px 10px; border-radius: 6px;
+  font-size: 0.74rem; line-height: 1.45;
+}
+.cp-loxo-status a { color: inherit; text-decoration: underline; }
+.cp-loxo-idle { background: var(--bg); color: var(--text-muted); }
+.cp-loxo-ok   { background: var(--green-soft); color: var(--green);
+                border-left: 2px solid var(--green); }
+.cp-loxo-err  { background: var(--red-soft); color: var(--red);
+                border-left: 2px solid var(--red); }
+.cp-loxo-detail { font-size: 0.68rem; color: inherit; opacity: 0.85;
+                  margin-top: 3px; }
+.cp-loxo-warn   { font-size: 0.68rem; color: var(--amber);
+                  background: var(--amber-soft); padding: 4px 6px;
+                  border-radius: 4px; margin-top: 5px; border-left: 2px solid var(--amber); }
+
+.cp-tabs-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.cp-tabs-bar {
+  display: flex; border-bottom: 1px solid var(--border); background: var(--bg);
+}
+.cp-tab-btn {
+  flex: 1; padding: 14px 16px; background: transparent; border: none;
+  cursor: pointer; font-family: 'Open Sans', sans-serif;
+  font-size: 0.88rem; font-weight: 600; color: var(--text-secondary);
+  border-bottom: 2px solid transparent; transition: all 0.1s;
+  /* Bumped from var(--text-muted) (#8c95a6) to var(--text-secondary)
+     (#5a6578) so inactive labels hit WCAG AA contrast against the --bg
+     track (was ~2.5:1, now ~5.4:1). */
+}
+.cp-tab-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.4); }
+.cp-tab-btn.cp-tab-active {
+  color: var(--navy); border-bottom-color: var(--pink); background: var(--surface);
+}
+
+.cp-tab-panel { display: none; min-height: 320px; padding: 18px 20px; }
+.cp-tab-panel.cp-tab-active { display: block; }
+
+.cp-tab-loading {
+  text-align: center; color: var(--text-muted); padding: 2.4rem 1rem;
+  font-size: 0.88rem;
+}
+/* Circular CSS spinner — pink arc on a light steel track. Replaces the
+   older hourglass glyph so the loading state matches the rest of the
+   brand (pink as highlight on a neutral rest state). */
+.cp-tab-loading::before {
+  content: ""; display: block;
+  width: 28px; height: 28px; margin: 0 auto 10px auto;
+  border: 3px solid var(--steel-soft);
+  border-top-color: var(--pink);
+  border-radius: 50%;
+  animation: cp-spin 0.9s infinite linear;
+}
+@keyframes cp-spin { to { transform: rotate(360deg); } }
+
+.cp-toast-area {
+  position: fixed; bottom: 20px; right: 24px; z-index: 100;
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.cp-toast {
+  background: var(--navy); color: #fff; padding: 9px 16px; border-radius: 6px;
+  font-size: 0.82rem; box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+  animation: cp-toast-in 0.2s ease-out, cp-toast-out 0.3s ease-in 2.7s forwards;
+  pointer-events: auto;
+}
+.cp-toast-success { background: var(--green); }
+.cp-toast-error { background: var(--red); }
+@keyframes cp-toast-in  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes cp-toast-out { to   { opacity: 0; transform: translateY(8px); } }
+
+.cp-warning {
+  background: var(--amber-soft); border-left: 3px solid var(--amber);
+  color: var(--amber); padding: 8px 12px; border-radius: 4px;
+  font-size: 0.82rem; margin-bottom: 12px;
+}
+
+/* ── Org match cards (Step 7) ──────────────────────────────────────── */
+.cp-org-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 980px) { .cp-org-lists { grid-template-columns: 1fr; } }
+
+.cp-org-list-block { display: flex; flex-direction: column; gap: 10px; }
+.cp-list-title {
+  font-size: 0.9rem; font-weight: 700; color: var(--navy);
+  margin: 0 0 2px 0; display: flex; align-items: center; gap: 8px;
+}
+.cp-list-count {
+  font-size: 0.72rem; font-weight: 700; padding: 2px 8px;
+  border-radius: 10px; background: var(--steel-soft); color: var(--steel);
+}
+.cp-list-desc { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 8px 0; line-height: 1.5; }
+.cp-list-empty {
+  font-size: 0.85rem; color: var(--text-secondary); padding: 16px 18px;
+  background: var(--bg); border: 1px dashed var(--border); border-radius: 6px;
+  line-height: 1.55;
+}
+.cp-list-empty p { margin: 0 0 8px 0; }
+.cp-list-empty p:last-child { margin-bottom: 0; }
+.cp-list-empty strong { color: var(--text-primary); }
+.cp-list-empty ul { margin: 4px 0 0 0; padding-left: 22px; }
+.cp-list-empty li { margin-bottom: 3px; }
+
+.cp-org-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid #cbd5e1; border-radius: 10px;
+  padding: 14px 16px; transition: box-shadow 0.12s;
+}
+.cp-org-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.cp-org-band-hot  { border-left-color: var(--pink); }
+.cp-org-band-warm { border-left-color: var(--amber); }
+
+.cp-org-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cp-org-rank { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); min-width: 1.5rem; }
+.cp-org-name {
+  font-size: 0.95rem; font-weight: 700; color: var(--navy);
+  text-decoration: none; line-height: 1.3;
+  text-transform: none;
+}
+.cp-org-name:hover { color: var(--pink); text-decoration: underline; }
+.cp-org-score {
+  margin-left: auto; font-size: 0.82rem; font-weight: 700;
+  color: var(--steel);
+  background: var(--steel-soft); padding: 2px 9px; border-radius: 10px;
+}
+.cp-org-meta { font-size: 0.8rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
+.cp-org-situation {
+  margin: 8px 0 0 0; padding-left: 20px;
+  font-size: 0.82rem; color: var(--text-primary);
+  line-height: 1.6;
+}
+.cp-org-situation li { margin-bottom: 3px; }
+/* Rationale is recruiter-internal context. Text in --text-primary for AA
+   contrast on --steel-soft (steel-on-steel-soft fails AA); steel reserved
+   for the accent border + pill background. */
+.cp-org-rationale {
+  font-size: 0.8rem; color: var(--text-primary); background: var(--steel-soft);
+  border-left: 3px solid var(--steel); padding: 6px 10px; border-radius: 6px;
+  margin-top: 8px; line-height: 1.5;
+}
+.cp-org-summary { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.55; }
+.cp-org-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.cp-org-actions a {
+  font-size: 0.74rem; font-weight: 600; padding: 4px 10px; border-radius: 6px;
+  text-decoration: none; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); transition: all 0.1s;
+  min-height: 24px; display: inline-flex; align-items: center;
+}
+.cp-org-actions a:hover { border-color: var(--steel); color: var(--steel); background: #f8faff; }
+
+/* ── Prep pack preview ─────────────────────────────────────────────── */
+.cp-prep-wrap { display: flex; flex-direction: column; gap: 16px; }
+.cp-prep-empty {
+  font-size: 0.88rem; color: var(--text-muted); padding: 18px;
+  background: var(--bg); border: 1px dashed var(--border); border-radius: 8px;
+  text-align: center;
+}
+.cp-prep-dl {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--pink-soft); border: 1px solid #f7c4e1;
+  border-radius: 8px; padding: 12px 16px;
+}
+.cp-prep-dl-text { font-size: 0.9rem; color: var(--text-primary); }
+/* Download banner right-side: size selector + PDF button, grouped so they
+   sit together on a single line (wraps to its own row on narrow viewports
+   via the parent .cp-prep-dl flex). */
+.cp-prep-dl-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.cp-prep-dl-size {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.76rem; color: var(--text-secondary); font-weight: 600;
+}
+.cp-prep-dl-size span {
+  text-transform: uppercase; letter-spacing: 0.5px;
+  font-size: 0.72rem; color: var(--text-secondary); font-weight: 700;
+}
+.cp-prep-dl-select {
+  font-family: 'Open Sans', sans-serif; font-size: 0.82rem; font-weight: 600;
+  color: var(--text-primary); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 5px;
+  padding: 5px 8px; cursor: pointer;
+  transition: border-color 0.12s;
+}
+.cp-prep-dl-select:hover { border-color: var(--steel); }
+.cp-prep-dl-select:focus { outline: none; border-color: var(--pink); }
+.cp-prep-dl-btn {
+  padding: 7px 18px; background: var(--pink); color: #fff !important;
+  border-radius: 6px; font-weight: 600; font-size: 0.85rem;
+  text-decoration: none; transition: background 0.12s;
+}
+.cp-prep-dl-btn:hover { background: #e6449e; }
+
+/* Banner shown when the AI talking-points generator is unavailable, so the
+   user understands why the "talking points" section is missing from each
+   briefing. Data-driven sections (financials, news, leadership) still render. */
+.cp-prep-haiku-off {
+  background: var(--amber-soft); border: 1px solid #f5d4a0;
+  border-left: 3px solid var(--amber); border-radius: 6px;
+  padding: 12px 14px; font-size: 0.82rem; color: var(--text-primary);
+  line-height: 1.5;
+}
+.cp-prep-haiku-off strong { color: #8a3e04; margin-right: 4px; }
+
+.cp-prep-org {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow-sm);
+}
+.cp-prep-org-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.cp-prep-org-name {
+  font-size: 1.05rem; font-weight: 700; color: var(--navy); margin: 0;
+  line-height: 1.3; text-transform: none;
+}
+.cp-prep-rationale {
+  font-size: 0.82rem; color: var(--text-primary); background: var(--steel-soft);
+  border-left: 3px solid var(--steel); padding: 6px 10px; border-radius: 6px;
+  margin: 6px 0 10px 0; line-height: 1.5;
+}
+.cp-prep-summary { font-size: 0.82rem; color: var(--text-secondary); margin: 4px 0; line-height: 1.5; }
+.cp-prep-section { margin-top: 10px; }
+.cp-prep-section .ds-label { margin: 6px 0 4px 0; display: block; }
+.cp-prep-metrics { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.82rem; }
+.cp-prep-metric strong { color: var(--text-secondary); font-weight: 700; margin-right: 6px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.cp-prep-news, .cp-prep-contacts, .cp-prep-points {
+  margin: 0; padding-left: 20px; font-size: 0.84rem; line-height: 1.6;
+  color: var(--text-primary);
+}
+.cp-prep-news a { color: var(--navy); text-decoration: none; font-weight: 600; }
+.cp-prep-news a:hover { color: var(--pink); text-decoration: underline; }
+.cp-prep-news-date { font-size: 0.74rem; color: var(--text-secondary); font-weight: 600; margin-left: 4px; }
+.cp-prep-points li { margin-bottom: 2px; }
+
+/* ── Pitch email cards ─────────────────────────────────────────────── */
+.cp-email-list-intro { font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5; }
+.cp-email-list-intro p { margin: 0; }
+.cp-email-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px 22px; margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.cp-email-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+/* Scoped override for the rank chip inside the email card — the default
+   .cp-org-rank (used in the orgs tab) is 10px/muted which disappears here.
+   Use a steel-soft pill so it's legible without competing with the org
+   name (pink is reserved for the active tab underline + primary CTAs). */
+.cp-email-head .cp-org-rank {
+  font-size: 0.75rem; font-weight: 700;
+  color: var(--steel); background: var(--steel-soft);
+  padding: 2px 10px; border-radius: 10px; min-width: auto;
+}
+.cp-email-org {
+  font-size: 1.1rem; font-weight: 700; color: var(--navy);
+  line-height: 1.3; text-transform: none;
+}
+.cp-email-subject {
+  font-size: 0.92rem; color: var(--text-primary); padding: 8px 0;
+  border-bottom: 1px solid var(--border); margin-bottom: 12px;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
+  font-weight: 600;
+}
+.cp-email-label {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--text-secondary); margin-right: 4px;
+  align-self: center;
+}
+.cp-email-body {
+  font-family: 'Open Sans', sans-serif; font-size: 0.94rem;
+  color: var(--text-primary); background: var(--bg); padding: 16px 18px;
+  border-radius: 6px; white-space: pre-wrap; word-wrap: break-word;
+  margin: 0 0 12px 0; line-height: 1.7;
+  border: 1px solid #eceff4;
+}
+/* Rationale reframed as a subtle footer note — recruiter-internal info
+   belongs BELOW the email copy, not above it, so the eye reaches the
+   email body first. Muted italic, dashed top divider, no heavy fill. */
+.cp-email-rationale {
+  font-size: 0.76rem; color: var(--text-secondary);
+  background: transparent; border: none;
+  border-top: 1px dashed var(--border);
+  padding: 8px 0 0 0; border-radius: 0;
+  margin: 0 0 10px 0; line-height: 1.5; font-style: italic;
+}
+.cp-email-rationale::before {
+  content: "Why this match: "; font-style: normal; font-weight: 700;
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--text-secondary); margin-right: 4px;
+}
+.cp-email-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cp-email-actions a, .cp-email-copy {
+  font-size: 0.8rem; font-weight: 600; padding: 7px 16px; border-radius: 6px;
+  text-decoration: none; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); cursor: pointer; font-family: 'Open Sans', sans-serif;
+  transition: all 0.1s; min-height: 32px; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.cp-email-copy {
+  /* Primary action on this card — bump to navy-on-white so recruiters
+     aren't hunting for it. Matches the Loxo push button pattern but
+     lighter so it doesn't compete with the truly primary nav CTA. */
+  border-color: var(--navy); color: var(--navy);
+}
+/* Open-in-Gmail sibling of Copy. Same navy outline so the two read as a
+   paired-action group; visually distinct from the tertiary "Report" link. */
+.cp-email-gmail {
+  border-color: var(--navy); color: var(--navy);
+}
+.cp-email-gmail:hover { background: var(--navy); color: #fff !important; }
+.cp-email-actions a:hover { border-color: var(--steel); color: var(--steel); background: #f8faff; }
+.cp-email-copy:hover { background: var(--navy); color: #fff; }
+</style>
+
+{% set p = session.profile %}
+{% set sid = session.session_id %}
+
+{% if warnings %}
+  {% for w in warnings %}
+    <div class="cp-warning">{{ w }}</div>
+  {% endfor %}
+{% endif %}
+
+<div class="cp-results-wrap">
+
+  {# ── LEFT: editable profile card ───────────────────────────────── #}
+  <aside class="cp-profile-card">
+    <h3>Candidate profile</h3>
+    <p class="cp-sub">Edit any field — changes save on blur.</p>
+
+    <div class="cp-field">
+      <label>Full name</label>
+      <input type="text" name="name" value="{{ p.name or '' }}"
+             placeholder="Not extracted"
+             hx-post="/candidates/summary/update?session={{ sid }}&field=name"
+             hx-trigger="blur changed"
+             hx-swap="none">
+    </div>
+
+    <div class="cp-field-row">
+      <div class="cp-field">
+        <label>Job title</label>
+        <input type="text" name="current_title" value="{{ p.current_title or '' }}"
+               placeholder="-"
+               hx-post="/candidates/summary/update?session={{ sid }}&field=current_title"
+               hx-trigger="blur changed" hx-swap="none">
+      </div>
+      <div class="cp-field">
+        <label>Current employer</label>
+        <input type="text" name="current_employer" value="{{ p.current_employer or '' }}"
+               placeholder="-"
+               hx-post="/candidates/summary/update?session={{ sid }}&field=current_employer"
+               hx-trigger="blur changed" hx-swap="none">
+      </div>
+    </div>
+
+    <div class="cp-field-row">
+      <div class="cp-field">
+        <label>Location</label>
+        <input type="text" name="location" value="{{ p.location or '' }}"
+               placeholder="City or postcode"
+               hx-post="/candidates/summary/update?session={{ sid }}&field=location"
+               hx-trigger="blur changed" hx-swap="none">
+      </div>
+      <div class="cp-field">
+        <label>Salary (&pound;)</label>
+        <input type="number" name="salary_expectation"
+               value="{{ p.salary_expectation if p.salary_expectation else '' }}"
+               placeholder="-" min="0"
+               hx-post="/candidates/summary/update?session={{ sid }}&field=salary_expectation"
+               hx-trigger="blur changed" hx-swap="none">
+      </div>
+    </div>
+
+    <div class="cp-field cp-field-notes">
+      <label>Recruiter notes</label>
+      <textarea name="summary"
+                placeholder="Reason for looking, ideal move, part/full time, flexible, remote only, causes of interest, long term aspirations"
+                hx-post="/candidates/summary/update?session={{ sid }}&field=summary"
+                hx-trigger="blur changed" hx-swap="none">{{ p.summary or '' }}</textarea>
+    </div>
+
+    {% if p.sectors %}
+      <label class="ds-label" style="margin:14px 0 4px;">Sectors</label>
+      <div class="cp-tags">
+        {% for s in p.sectors %}<span class="cp-tag">{{ s }}</span>{% endfor %}
+      </div>
+    {% endif %}
+
+    {% if p.fundraising_specialisms %}
+      <label class="ds-label" style="margin:14px 0 4px;">Fundraising specialisms</label>
+      <div class="cp-tags">
+        {% for s in p.fundraising_specialisms %}<span class="cp-tag">{{ s }}</span>{% endfor %}
+      </div>
+    {% endif %}
+
+    {% if p.red_flags %}
+      <label class="ds-label" style="margin:14px 0 4px;">Red flags</label>
+      {% for rf in p.red_flags %}
+        <div class="cp-red-flag">{{ rf }}</div>
+      {% endfor %}
+    {% endif %}
+
+    {# ── Save-to-Loxo block — the second downstream push after PDF export ── #}
+    <div class="cp-loxo-block">
+      <label class="ds-label">Push to CRM</label>
+      <button type="button"
+              class="cp-loxo-btn"
+              hx-post="/candidates/loxo-save?session={{ sid }}"
+              hx-target="#cp-loxo-status"
+              hx-swap="outerHTML"
+              hx-indicator="#cp-loxo-status"
+              hx-disabled-elt="this">
+        Save candidate to Loxo
+      </button>
+      {% set lx = (session.outputs or {}).get('loxo') %}
+      <div id="cp-loxo-status" class="cp-loxo-status cp-loxo-idle">
+        {% if lx and lx.get('error') %}
+          <strong>Loxo push failed</strong> &mdash; {{ lx.error }}
+        {% elif lx and lx.get('person_id') %}
+          <strong>Saved to Loxo</strong>
+          &middot;
+          <a href="{{ lx.loxo_url }}" target="_blank" rel="noopener">Open person #{{ lx.person_id }}</a>
+          <div class="cp-loxo-detail">
+            {% if lx.note_added %}note attached{% else %}note skipped{% endif %}
+            &middot;
+            {% if lx.resume_attached %}CV attached{% else %}CV not attached{% endif %}
+          </div>
+          {% if lx.warning %}<div class="cp-loxo-warn">{{ lx.warning }}</div>{% endif %}
+        {% else %}
+          Creates a person record in Loxo with a note containing the top matched orgs.
+        {% endif %}
+      </div>
+    </div>
+  </aside>
+
+  {# ── RIGHT: tabbed outputs ─────────────────────────────────────── #}
+  <section class="cp-tabs-card">
+    <div class="cp-tabs-bar" role="tablist">
+      <button type="button" class="cp-tab-btn cp-tab-active" data-cp-tab="orgs"
+              role="tab" aria-selected="true">Matched organisations</button>
+      <button type="button" class="cp-tab-btn" data-cp-tab="prep"
+              role="tab" aria-selected="false">Prep pack</button>
+      <button type="button" class="cp-tab-btn" data-cp-tab="emails"
+              role="tab" aria-selected="false">Draft emails</button>
+    </div>
+
+    {# Each panel lazy-loads independently on `load delay:80ms`. The three
+       fire immediately on insertion — parallel HTMX requests — so the user
+       never has to click a tab to begin generation. The Haiku throttle in
+       services/haiku_client.py keeps the concurrent calls under Anthropic's
+       rate limit. #}
+
+    <div id="cp-tab-orgs" class="cp-tab-panel cp-tab-active"
+         role="tabpanel"
+         hx-get="/candidates/tab/orgs?session={{ sid }}"
+         hx-trigger="load delay:80ms"
+         hx-swap="innerHTML">
+      <div class="cp-tab-loading">Ranking matched organisations&hellip;</div>
+    </div>
+
+    <div id="cp-tab-prep" class="cp-tab-panel"
+         role="tabpanel"
+         hx-get="/candidates/tab/prep?session={{ sid }}"
+         hx-trigger="load delay:80ms"
+         hx-swap="innerHTML">
+      <div class="cp-tab-loading">Building prep pack&hellip;</div>
+    </div>
+
+    <div id="cp-tab-emails" class="cp-tab-panel"
+         role="tabpanel"
+         hx-get="/candidates/tab/emails?session={{ sid }}"
+         hx-trigger="load delay:80ms"
+         hx-swap="innerHTML">
+      <div class="cp-tab-loading">Drafting emails&hellip;</div>
+    </div>
+  </section>
+</div>
+
+<div id="cp-toast-area" class="cp-toast-area" aria-live="polite"></div>
+
+<script>
+/* Tab switching + toast-on-save. Keep vanilla — no libs. The HTMX requests
+   for each tab fire on `load` regardless of which tab is visible, so
+   clicking a tab just changes visibility, never re-triggers generation. */
+(function() {
+  var btns   = document.querySelectorAll('.cp-tab-btn');
+  var panels = document.querySelectorAll('.cp-tab-panel');
+  btns.forEach(function(b) {
+    b.addEventListener('click', function() {
+      var target = b.getAttribute('data-cp-tab');
+      btns.forEach(function(x) {
+        var active = x.getAttribute('data-cp-tab') === target;
+        x.classList.toggle('cp-tab-active', active);
+        x.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      panels.forEach(function(p) {
+        p.classList.toggle('cp-tab-active', p.id === 'cp-tab-' + target);
+      });
+    });
+  });
+
+  // Toast on successful profile-field saves.
+  document.body.addEventListener('htmx:afterRequest', function(ev) {
+    var target = ev.detail.elt;
+    if (!target || !target.hasAttribute('hx-post')) return;
+    var url = target.getAttribute('hx-post') || '';
+    if (url.indexOf('/candidates/summary/update') === -1) return;
+
+    var area = document.getElementById('cp-toast-area');
+    if (!area) return;
+    var toast = document.createElement('div');
+    if (ev.detail.successful) {
+      toast.className = 'cp-toast cp-toast-success';
+      toast.textContent = 'Saved';
+    } else {
+      toast.className = 'cp-toast cp-toast-error';
+      toast.textContent = 'Could not save — try again';
+    }
+    area.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 3200);
+  });
+})();
+</script>

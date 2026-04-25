@@ -1,0 +1,49 @@
+{# Read-only view of the Jobs-tab relevance learner's current weights.
+   Rendered inside #review-learned on the review page (via HTMX). #}
+<div class="learned-panel">
+  <div class="learned-header">
+    <span class="learned-title">What the scorer has learned</span>
+    {% if has_weights %}
+    <span class="learned-meta">
+      {{ claim_count }} claims · {{ skip_count }} skips
+      {% if generated_at %} · updated {{ generated_at[:10] }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+
+  {% if not has_weights %}
+    <div class="learned-empty">
+      No learned signals yet. Use <strong>Claim</strong> / <strong>Skip</strong> on the Jobs tab and the nightly 02:00 run will pick up patterns. Minimum 2 of each for a phrase to be trusted.
+    </div>
+  {% else %}
+    <div class="learned-cols">
+      <div class="learned-col">
+        <div class="learned-col-head learned-col-head-boost">Boost</div>
+        {% if boost_keywords %}
+          <div class="learned-chips">
+            {% for kw in boost_keywords %}
+              <span class="learned-chip learned-chip-boost">{{ kw }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="learned-empty-inline">Not enough claims yet.</div>
+        {% endif %}
+      </div>
+      <div class="learned-col">
+        <div class="learned-col-head learned-col-head-suppress">Suppress</div>
+        {% if suppress_keywords %}
+          <div class="learned-chips">
+            {% for kw in suppress_keywords %}
+              <span class="learned-chip learned-chip-suppress">{{ kw }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="learned-empty-inline">Not enough skips yet.</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="learned-footnote">
+      Jobs containing boosted phrases rank higher on the Jobs tab; suppressed phrases rank lower. Review-tab decisions don't feed this — they measure data quality, not relevance.
+    </div>
+  {% endif %}
+</div>

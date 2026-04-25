@@ -1,0 +1,27 @@
+# robots.txt for nonprofitsage.ai
+# The platform is authenticated; only the public landing, privacy, and terms
+# pages are intended for indexing.
+
+User-agent: *
+Allow: /$
+Allow: /privacy
+Allow: /terms
+Disallow: /api/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /jobs
+Disallow: /intel
+Disallow: /pipeline
+Disallow: /news
+Disallow: /candidates
+Disallow: /schools
+Disallow: /agencies
+Disallow: /contracts
+Disallow: /partnerships
+Disallow: /events
+Disallow: /shortlist
+Disallow: /outreach
+Disallow: /reports
+Disallow: /logout
+
+Sitemap: https://nonprofitsage.ai/sitemap.xml

@@ -1,0 +1,134 @@
+<article class="dossier-panel">
+    <header>
+        <h3 class="ds-label" style="margin:0;">Peer Organisations
+            {% if match_description %}
+            <small style="font-weight:normal;color:var(--text-muted);">
+                (matched by {{ match_description }})
+            </small>
+            {% endif %}
+        </h3>
+    </header>
+
+    {% if peers %}
+
+    {# Narrative summary comparing target to peer group #}
+    {% if summary %}
+    <div class="insight-box" style="margin-bottom:1rem;">
+        {{ summary }}
+    </div>
+    {% endif %}
+
+    <table role="grid" class="peer-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Organisation</th>
+                <th>Match</th>
+                <th>Income</th>
+                <th>Deficit / Surplus</th>
+                <th>Reserves</th>
+                <th>Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in peers[:10] %}
+            <tr>
+                <td>{{ p.get('peer_rank', loop.index) }}</td>
+                <td>
+                    {% set peer_id = p.get('peer_org_id', '') or '' %}
+                    {% set peer_name = p.get('peer_org_name', '') or peer_id %}
+                    {% if peer_id %}
+                        <a href="/org/{{ peer_id }}">{{ peer_name }}</a>
+                    {% else %}
+                        {{ peer_name }}
+                    {% endif %}
+                </td>
+                <td>
+                    <small>{{ p.get('matching_criteria', '') or '—' }}</small>
+                    {% if p.get('match_type') == 'basic_match' %}
+                    <br><small style="color:var(--text-muted);">(basic match)</small>
+                    {% elif p.get('match_type') == 'charitybase_match' %}
+                    <br><small style="color:var(--green);">(CharityBase)</small>
+                    {% endif %}
+                </td>
+                <td>
+                    {% set inc = p.get('income') %}
+                    {% if inc is not none %}
+                        {{ inc | currency }}
+                        {% if target.get('total_income') is not none %}
+                            <br><small style="color:var(--text-muted);">target: {{ target['total_income'] | currency }}</small>
+                        {% endif %}
+                    {% else %}
+                        <span style="color:var(--text-muted);">N/A</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% set deficit = p.get('deficit') %}
+                    {% if deficit is not none %}
+                        {% if deficit < 0 %}
+                            <span style="color:var(--red);">{{ deficit | currency }}</span>
+                        {% else %}
+                            <span style="color:var(--green);">{{ deficit | currency }}</span>
+                        {% endif %}
+                        {% if target.get('surplus_deficit') is not none %}
+                            <br><small style="color:var(--text-muted);">target: {{ target['surplus_deficit'] | currency }}</small>
+                        {% endif %}
+                    {% else %}
+                        <span style="color:var(--text-muted);">N/A</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% set runway = p.get('runway') %}
+                    {% if runway is not none %}
+                        {{ "%.1f"|format(runway) }} mo
+                        {% if target.get('reserves_runway_months') is not none %}
+                            <br><small style="color:var(--text-muted);">target: {{ "%.1f"|format(target['reserves_runway_months']|float) }} mo</small>
+                        {% endif %}
+                    {% elif p.get('reserves') is not none %}
+                        {{ p['reserves'] | currency }}
+                        {% if target.get('total_reserves') is not none %}
+                            <br><small style="color:var(--text-muted);">target: {{ target['total_reserves'] | currency }}</small>
+                        {% endif %}
+                    {% else %}
+                        <span style="color:var(--text-muted);">N/A</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% set score = p.get('score') %}
+                    {% if score is not none %}
+                        {{ "%.0f"|format(score) }}
+                        {% if p.get('score_band') %}
+                            <br><small>{{ p['score_band'] }}</small>
+                        {% endif %}
+                    {% else %}
+                        <span style="color:var(--text-muted);">N/A</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if peers|length > 10 %}
+    <p class="panel-note">Showing top 10 of {{ peers|length }} peers</p>
+    {% endif %}
+    {% else %}
+    <p class="panel-empty">No peer data available for this organisation.</p>
+    {% endif %}
+
+    <!-- Suggest better peers -->
+    <div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border);">
+        <form hx-post="/api/triage/{{ org_id }}/suggest-peers"
+              hx-target="#peer-suggestion-result"
+              hx-swap="innerHTML"
+              class="filter-row">
+            <input type="text" name="suggestion"
+                   placeholder="Suggest better peers (e.g. Diabetes UK, MS Society)"
+                   style="flex:1;"
+                   required>
+            <button type="submit" class="btn-secondary">
+                Suggest
+            </button>
+        </form>
+        <div id="peer-suggestion-result"></div>
+    </div>
+</article>

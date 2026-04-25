@@ -1,0 +1,42 @@
+{# Per-contact action row — rendered inline inside dossier_contacts.html
+   AND returned standalone by POST /api/enrich/{contact_id} so HTMX can
+   swap it after an enrichment attempt. Keep self-contained so the same
+   include works in both contexts. #}
+<div class="contact-actions" id="contact-actions-{{ contact_id }}">
+    {% if enrichment_locked %}
+        <button class="btn-contact btn-contact--enrich btn-contact--locked"
+                type="button"
+                disabled
+                title="Enriched {{ last_enriched_display }} — available again in {{ days_until_unlock }} day{{ 's' if days_until_unlock != 1 else '' }}">
+            Enrich Contact · Available in {{ days_until_unlock }} day{{ 's' if days_until_unlock != 1 else '' }}
+        </button>
+    {% else %}
+        <button class="btn-contact btn-contact--enrich"
+                type="button"
+                hx-post="/api/enrich/{{ contact_id }}"
+                hx-target="#contact-actions-{{ contact_id }}"
+                hx-swap="outerHTML"
+                hx-on::after-request="if(event.detail.xhr.status===429){var d=0;try{d=JSON.parse(event.detail.xhr.responseText).days_remaining||0;}catch(e){}this.textContent='Cooldown active · '+d+' day'+(d===1?'':'s')+' remaining';this.disabled=true;}"
+                title="Call Derrick to resolve an email for this contact's LinkedIn profile. 30-day cooldown after each run.">
+            Enrich Contact
+        </button>
+    {% endif %}
+
+    {% if linkedin_url %}
+        <a class="btn-contact btn-contact--linkedin"
+           href="{{ linkedin_url }}"
+           target="_blank" rel="noopener noreferrer"
+           title="Open the profile on LinkedIn — users with the Loxo browser extension can add to Loxo from there.">
+            View on LinkedIn
+        </a>
+    {% endif %}
+
+    {% if resolved_email %}
+        <span class="btn-contact-note btn-contact-note--ok"
+              title="Resolved from LinkedIn via Derrick">
+            Email found: {{ resolved_email }}
+        </span>
+    {% elif lookup_note %}
+        <span class="btn-contact-note btn-contact-note--muted">{{ lookup_note }}</span>
+    {% endif %}
+</div>

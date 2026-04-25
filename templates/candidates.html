@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+{% block title %}Candidates — NonprofitSage.ai{% endblock %}
+{% block content %}
+
+<style>
+/* ── Candidate match cards (generated server-side, keep mm-* names) ── */
+#match-results .htmx-indicator { display: none; }
+#match-results.htmx-request .htmx-indicator { display: block; }
+
+.mm-loading { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.88rem; }
+.mm-loading::before { content: "\23F3"; font-size: 1.4rem; display: block; margin-bottom: 0.4rem; }
+
+.mm-card {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid #cbd5e1;
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 6px;
+  box-shadow: var(--shadow-sm); transition: box-shadow 0.12s;
+}
+.mm-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.mm-card-hot  { border-left-color: var(--pink) !important; }
+.mm-card-warm { border-left-color: var(--amber) !important; }
+
+.mm-head   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mm-rank   { font-size: 0.65rem; font-weight: 700; color: var(--text-muted); min-width: 1.4rem; }
+.mm-orgname { font-size: 14px; font-weight: 700; color: var(--navy); text-decoration: none; }
+.mm-orgname:hover { color: var(--pink); text-decoration: underline; }
+.mm-badge  { padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; vertical-align: middle; }
+.mm-badge-hot  { background: var(--red-soft); color: var(--red); }
+.mm-badge-warm { background: var(--amber-soft); color: var(--amber); }
+.mm-score  { margin-left: auto; font-size: 0.78rem; font-weight: 700; color: var(--text-primary); }
+.mm-ctx    { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
+
+.mm-break  { font-size: 0.72rem; color: var(--text-secondary); margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+.mm-break span { background: var(--bg); border-radius: 10px; padding: 2px 9px; font-size: 0.68rem; }
+
+.mm-pitch {
+  font-size: 0.82rem; color: var(--text-primary); background: var(--amber-soft);
+  border: 1px solid #fed7aa; border-left: 3px solid #ff6b35;
+  border-radius: 6px; padding: 8px 12px; margin-top: 8px;
+}
+.mm-pitch strong { color: #9a3412; }
+.mm-pitch.loading { color: var(--text-muted); font-style: italic; }
+
+.mm-strategy { font-size: 0.73rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.4; }
+.mm-strategy strong { color: var(--text-primary); }
+
+.mm-acts { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.mm-acts a, .mm-acts button {
+  font-size: 0.65rem; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+  text-decoration: none; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); cursor: pointer; font-family: 'Open Sans', sans-serif;
+  transition: all 0.1s;
+}
+.mm-acts a:hover, .mm-acts button:hover { border-color: var(--steel); color: var(--steel); background: #f8faff; }
+.mm-acts .mm-act-primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+.mm-acts .mm-act-primary:hover { background: #1e2e3d; }
+
+/* ── Browse-results org cards ── */
+.browse-card {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid #cbd5e1;
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 6px;
+  box-shadow: var(--shadow-sm); transition: box-shadow 0.12s;
+}
+.browse-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.browse-card-inner { display: flex; justify-content: space-between; align-items: start; }
+.browse-org-name { font-weight: 700; font-size: 14px; color: var(--navy); text-decoration: none; }
+.browse-org-name:hover { color: var(--pink); }
+.browse-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+.browse-links { display: flex; gap: 4px; }
+.browse-link {
+  font-size: 0.65rem; font-weight: 600; padding: 2px 8px; border-radius: 4px;
+  background: var(--steel-soft); border: 1px solid var(--border); color: var(--steel);
+  text-decoration: none; transition: all 0.1s;
+}
+.browse-link:hover { border-color: var(--steel); color: var(--text-primary); }
+
+/* ── Filter form grid ── */
+.filter-grid-4 {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 8px; margin-bottom: 10px;
+}
+.filter-grid-4 input, .filter-grid-4 select { width: 100%; }
+
+/* ── Candidate profiler upload card ── */
+.cp-upload-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px 22px; margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.cp-upload-card h2 { margin: 0 0 4px 0; }
+.cp-desc { color: var(--text-secondary); font-size: 0.88rem; margin: 0 0 16px 0; line-height: 1.5; }
+
+.cp-dropzone {
+  border: 2px dashed var(--border); border-radius: 8px; padding: 22px 16px;
+  text-align: center; background: var(--bg); margin-bottom: 14px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  cursor: pointer;
+}
+.cp-dropzone:hover { border-color: var(--steel); background: var(--steel-soft); }
+.cp-dropzone-active { border-color: var(--pink) !important; background: var(--pink-soft) !important; }
+.cp-dropzone-title { font-size: 0.92rem; font-weight: 600; color: var(--text-primary); margin: 0 0 3px 0; }
+.cp-dropzone-sub { font-size: 0.78rem; color: var(--text-muted); margin: 0; }
+.cp-dropzone-browse { color: var(--pink); text-decoration: underline; cursor: pointer; font-weight: 600; }
+.cp-file-input { display: none; }
+.cp-file-list { list-style: none; padding: 0; margin: 10px 0 0 0; text-align: left; }
+.cp-file-list:empty { display: none; }
+.cp-file-item {
+  font-size: 0.78rem; color: var(--text-secondary); padding: 5px 9px;
+  background: var(--surface); border-radius: 5px; margin-bottom: 3px;
+  border: 1px solid var(--border); display: flex; justify-content: space-between;
+}
+.cp-file-item-size { color: var(--text-muted); font-size: 0.72rem; }
+
+.cp-notes-wrap label { display: block; margin-bottom: 4px; }
+.cp-notes {
+  width: 100%; min-height: 96px; resize: vertical;
+  font-family: 'Open Sans', sans-serif; font-size: 0.9rem;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text-primary);
+  box-sizing: border-box;
+}
+.cp-notes:focus { outline: 2px solid var(--pink); border-color: var(--pink); }
+
+.cp-analyse-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+/* ── Sub-tab strip ── */
+.sub-tabs {
+  display: flex; gap: 4px; margin: 0 0 14px 0; border-bottom: 1px solid var(--border);
+}
+.sub-tab {
+  padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--text-muted);
+  text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color 0.1s, border-color 0.1s;
+}
+.sub-tab:hover { color: var(--text-primary); }
+.sub-tab-active { color: var(--text-primary); border-bottom-color: var(--pink); }
+
+/* ── People search ── */
+.ps-card {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--steel);
+  border-radius: 8px; padding: 14px 16px; margin-bottom: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.ps-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ps-name { font-size: 14px; font-weight: 700; color: var(--navy); margin: 0; }
+.ps-source-badge {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 2px 7px; border-radius: 8px; background: var(--steel-soft); color: var(--steel);
+}
+.ps-rel-badge {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 2px 7px; border-radius: 8px; background: var(--pink-soft); color: var(--pink);
+}
+.ps-meta { font-size: 12px; color: var(--text-secondary); margin: 4px 0 0 0; }
+.ps-timeline { margin: 8px 0 0 0; padding: 0; list-style: none; border-left: 2px solid var(--border); padding-left: 12px; }
+.ps-timeline li { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.ps-timeline li.current { color: var(--text-primary); font-weight: 600; }
+</style>
+
+<div class="sub-tabs">
+    <a href="#profiler" class="sub-tab {% if view != 'people' %}sub-tab-active{% endif %}"
+       onclick="showTab('profiler', this); return false;">Candidate profiler</a>
+    <a href="#people" class="sub-tab {% if view == 'people' %}sub-tab-active{% endif %}"
+       onclick="showTab('people', this); return false;">People search</a>
+</div>
+
+<div id="view-people" style="display: {% if view == 'people' %}block{% else %}none{% endif %};">
+    <h2 style="margin:0 0 4px 0;">People search</h2>
+    <p class="page-desc" style="margin:0 0 12px 0; color:var(--text-secondary); font-size:13px;">
+        Find anyone we've tracked — connections, contacts from Loxo, candidates you've analysed, and people mentioned in CVs.
+        Search by name, email, job title, or employer.
+    </p>
+    <form class="nl-search" style="margin-bottom:12px;"
+          hx-get="/candidates/people/search" hx-target="#people-results" hx-swap="innerHTML"
+          hx-trigger="submit, keyup changed delay:400ms from:find input[name=q]"
+          hx-indicator="#people-results">
+        <input type="search" name="q" placeholder="e.g. Jane Smith / Director of Fundraising / Wellcome"
+               style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-size:13px;"
+               autofocus>
+    </form>
+    <div id="people-results">
+        <p style="color:var(--text-muted); font-size:13px;">Type a name, title, employer, or email above to search the people history store.</p>
+    </div>
+</div>
+
+<div id="view-profiler" style="display: {% if view == 'people' %}none{% else %}block{% endif %};">
+
+<div class="cp-upload-card">
+    <h2>Candidate profiler</h2>
+    <p class="cp-desc">Upload a CV, LinkedIn export, or paste recruiter notes — we'll extract a structured profile, match the candidate to charities across the UK, and draft outreach.</p>
+    <p style="font-size:0.78rem;color:var(--text-muted);margin:-8px 0 14px 0;">
+      <strong>Returns:</strong> structured profile · top 20 charity matches · tailored pitch &amp; outreach draft per match.
+      &middot;
+      <a href="#" hx-get="/candidates/sample-output" hx-target="#match-results" hx-swap="innerHTML"
+         style="color:var(--steel);font-weight:600;text-decoration:underline;">Show me a sample output</a>
+    </p>
+
+    <form id="analyse-form"
+          hx-post="/candidates/analyse"
+          hx-target="#match-results"
+          hx-swap="innerHTML"
+          hx-trigger="submit"
+          hx-encoding="multipart/form-data"
+          hx-indicator="#match-results">
+
+        <div id="cp-dropzone" class="cp-dropzone" onclick="document.getElementById('cp-files').click()">
+            <p class="cp-dropzone-title">Drop CV or LinkedIn PDF here</p>
+            <p class="cp-dropzone-sub">PDF or DOCX, up to 10MB each &middot; or <span class="cp-dropzone-browse">browse files</span></p>
+            <input id="cp-files" type="file" name="files" multiple accept=".pdf,.docx" class="cp-file-input">
+            <ul id="cp-file-list" class="cp-file-list"></ul>
+        </div>
+
+        <div class="cp-notes-wrap">
+            <label for="cp-notes" class="ds-label">Recruiter notes</label>
+            <textarea id="cp-notes" name="notes" class="cp-notes" placeholder="What are they looking for? Salary, location, motivations, anything you want the analysis to weigh.&#10;e.g. Looking for a Director of Fundraising role at an NHS charity in London, £90k+, strong major gifts background, lives in SW London."></textarea>
+        </div>
+
+        <div class="cp-analyse-actions">
+            <button type="submit" class="nl-search-btn">Analyse</button>
+            <span class="nl-search-powered">Powered by Claude Haiku &mdash; profile, 18,000 charity match, and outreach in one pass.</span>
+        </div>
+    </form>
+</div>
+
+<div id="match-results">
+    <div class="htmx-indicator mm-loading">Parsing documents, extracting profile, matching orgs&hellip;</div>
+</div>
+
+<script>
+/* Dropzone: click-to-browse is handled via inline onclick; this adds drag-and-drop
+   + file list preview. Keep vanilla JS — no libraries. */
+(function() {
+    var dz = document.getElementById('cp-dropzone');
+    var input = document.getElementById('cp-files');
+    var list = document.getElementById('cp-file-list');
+    if (!dz || !input || !list) return;
+
+    function renderList() {
+        list.innerHTML = '';
+        for (var i = 0; i < input.files.length; i++) {
+            var f = input.files[i];
+            var li = document.createElement('li');
+            li.className = 'cp-file-item';
+            var name = document.createElement('span');
+            name.textContent = f.name;
+            var size = document.createElement('span');
+            size.className = 'cp-file-item-size';
+            size.textContent = Math.round(f.size / 1024) + ' KB';
+            li.appendChild(name);
+            li.appendChild(size);
+            list.appendChild(li);
+        }
+    }
+    input.addEventListener('change', renderList);
+
+    ['dragenter', 'dragover'].forEach(function(evt) {
+        dz.addEventListener(evt, function(e) {
+            e.preventDefault(); e.stopPropagation();
+            dz.classList.add('cp-dropzone-active');
+        });
+    });
+    ['dragleave', 'drop'].forEach(function(evt) {
+        dz.addEventListener(evt, function(e) {
+            e.preventDefault(); e.stopPropagation();
+            dz.classList.remove('cp-dropzone-active');
+        });
+    });
+    dz.addEventListener('drop', function(e) {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+            input.files = e.dataTransfer.files;
+            renderList();
+        }
+    });
+})();
+</script>
+
+<div class="nl-search-divider">Or browse organisations by filter</div>
+
+<form id="org-filters"
+      hx-get="/candidates/results"
+      hx-target="#org-results"
+      hx-swap="innerHTML"
+      hx-trigger="submit"
+      hx-include="#org-filters"
+      class="nl-search">
+
+    <div class="filter-grid-4">
+        <div>
+            <label class="ds-label">Postcode</label>
+            <input type="text" name="postcode" placeholder="e.g. SW1A 1AA">
+        </div>
+        <div>
+            <label class="ds-label">Radius</label>
+            <select name="radius">
+                <option value="0">All UK</option>
+                <option value="5">5 miles</option>
+                <option value="10">10 miles</option>
+                <option value="25" selected>25 miles</option>
+                <option value="50">50 miles</option>
+            </select>
+        </div>
+        <div>
+            <label class="ds-label">Cause</label>
+            <select name="cause">
+                <option value="">All causes</option>
+                <option value="Health">Health</option>
+                <option value="Education">Education</option>
+                <option value="Disability">Disability</option>
+                <option value="Animals">Animals</option>
+                <option value="Environment">Environment</option>
+                <option value="Housing">Housing</option>
+                <option value="International">International</option>
+                <option value="Religious">Religious</option>
+                <option value="Sport">Sport</option>
+            </select>
+        </div>
+        <div>
+            <label class="ds-label">Size (income)</label>
+            <select name="income_band">
+                <option value="">All sizes</option>
+                <option value="10m+">&pound;10m+</option>
+                <option value="5-10m">&pound;5-10m</option>
+                <option value="1-5m">&pound;1-5m</option>
+                <option value="500k-1m">&pound;500k-1m</option>
+                <option value="100-500k">&pound;100-500k</option>
+            </select>
+        </div>
+    </div>
+    <button type="submit" class="nl-search-btn">Search</button>
+</form>
+
+<div id="org-results">
+    <p class="page-desc">Select filters above to browse organisations.</p>
+</div>
+
+</div><!-- /view-profiler -->
+
+<script>
+function showTab(name, el) {
+    var ids = ['profiler', 'people'];
+    for (var i = 0; i < ids.length; i++) {
+        var d = document.getElementById('view-' + ids[i]);
+        if (d) d.style.display = (ids[i] === name) ? 'block' : 'none';
+    }
+    var tabs = document.querySelectorAll('.sub-tab');
+    tabs.forEach(function(t) { t.classList.remove('sub-tab-active'); });
+    if (el) el.classList.add('sub-tab-active');
+    history.replaceState(null, '', '#' + name);
+}
+// Honour hash on load
+if (window.location.hash === '#people') {
+    var peopleTab = document.querySelector('.sub-tab[href="#people"]');
+    if (peopleTab) showTab('people', peopleTab);
+}
+</script>
+
+{% endblock %}

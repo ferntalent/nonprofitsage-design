@@ -1,0 +1,48 @@
+{% set org_name = (master.get('org_name', org_id) or org_id) | smart_org %}
+{% set cause = master.get('cause_area', '') or '' %}
+{% set location = master.get('address_region', '') or '' %}
+{% set income = master.get('latest_total_gross_income', '') %}
+{% set website = master.get('website', '') or '' %}
+{% set charity_number = master.get('charity_number', '') or master.get('charity_number_ew', '') or '' %}
+
+<header class="dossier-header">
+    <div class="dossier-title-row">
+        {% if website %}
+        <img src="https://www.google.com/s2/favicons?domain={{ website | domain_only }}&sz=128"
+             onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain={{ website | domain_only }}&sz=32';this.style.opacity='0.5';"
+             alt="" width="36" height="36"
+             style="border-radius:6px;flex-shrink:0;">
+        {% endif %}
+        <h1>{{ org_name }}</h1>
+        {% if opp %}
+            {% set frame = opp.get('primary_frame', '') or '' %}
+            {% if frame == 'bleeding_neck' %}
+                <span class="badge badge-bn" title="Distress signal — organisation showing signs of financial or operational difficulty">Distress signal</span>
+            {% elif frame == 'fresh_wallet' %}
+                <span class="badge badge-fw" title="Growth signal — organisation showing signs of expansion or new spending">Growth signal</span>
+            {% endif %}
+        {% endif %}
+    </div>
+    <div class="dossier-meta">
+        {% if cause %}<span class="meta-item">{{ cause }}</span>{% endif %}
+        {% if location %}<span class="meta-item">{{ location }}</span>{% endif %}
+        {% if charity_number %}<span class="meta-item">Charity #{{ charity_number }}</span>{% endif %}
+        {% if income %}
+            <span class="meta-item">Income: &pound;{{ "{:,.0f}".format(income|float) if income else 'N/A' }}</span>
+        {% endif %}
+    </div>
+    <div class="dossier-links">
+        {% if website %}
+            <a href="{{ website }}" target="_blank" rel="noopener" class="link-pill">Website</a>
+        {% endif %}
+        {% if charity_number %}
+            <a href="https://register-of-charities.charitycommission.gov.uk/charity-search/-/charity-details/{{ charity_number }}"
+               target="_blank" rel="noopener" class="link-pill" title="View on the Charity Commission register">Register</a>
+        {% endif %}
+        <a href="https://fern-talent.app.loxo.co/agencies/40830/companies?query={{ org_name | urlencode }}"
+           target="_blank" rel="noopener" class="link-pill">
+            Open in Loxo
+        </a>
+        <a href="/pipeline" class="link-pill">Back to Intel</a>
+    </div>
+</header>

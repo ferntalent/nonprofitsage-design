@@ -1,0 +1,31 @@
+{% if fallback_notice %}
+<div style="margin:0 0 0.75rem 0;padding:0.55rem 0.75rem;background:var(--amber-soft);border-left:3px solid var(--amber);border-radius:6px;font-size:0.8rem;color:var(--amber);line-height:1.4;">
+  {{ fallback_notice }}
+</div>
+{% endif %}
+
+{% if not items %}
+<div style="text-align:center;padding:2.5rem 1rem;color:var(--text-muted);">
+  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.5" style="margin-bottom:0.5rem;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <div style="font-size:0.9rem;font-weight:700;color:var(--text-secondary);">Organisation not found</div>
+  <div style="font-size:0.78rem;margin-top:0.25rem;">Try a different name or clear your filters</div>
+</div>
+{% endif %}
+
+{% for item in items %}
+    {% include "components/card.html" %}
+{% endfor %}
+
+{% if items|length + offset < total %}
+{# Every param the /pipeline/cards endpoint accepts must be forwarded
+   here so the auto-fired Load More (pipeline.html::pipelineTriaged
+   when the open queue drops below 5) stays inside the user's active
+   filter set. Codex flagged this on the #355 follow-up review. #}
+<button class="load-more"
+        hx-get="/pipeline/cards?status={{ status }}&primary_frame={{ primary_frame }}&score_band={{ score_band }}&min_score={{ min_score }}&sort={{ sort or '' }}&funding_model={{ funding_model or '' }}&funding_stream={{ funding_stream or '' }}&org_search={{ (org_search or '') | urlencode }}&cause_area={{ (cause_area or '') | urlencode }}&region={{ (region or '') | urlencode }}&income_band_key={{ income_band_key or '' }}&income_min={{ income_min or '' }}&income_max={{ income_max or '' }}&signal_tag={{ signal_tag or '' }}&show_claimed={{ show_claimed or '' }}&show_skipped={{ show_skipped or '' }}&offset={{ offset + limit }}&limit={{ limit }}"
+        hx-target="#pipeline-card-list"
+        hx-swap="beforeend"
+        hx-on::after-request="this.remove()">
+    Load more ({{ total - offset - items|length }} remaining)
+</button>
+{% endif %}

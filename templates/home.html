@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NonprofitSage.ai — Predictive intelligence for the UK nonprofit sector</title>
+    <link rel="icon" type="image/svg+xml" href="/static/np-mark.svg?v=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="/static/fonts/open-sans-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/brand.css?v=81">
+    <meta property="og:title" content="NonprofitSage.ai">
+    <meta property="og:description" content="Predictive intelligence for the UK nonprofit sector — 30,000+ organisations tracked, scored daily.">
+    <meta property="og:url" content="https://nonprofitsage.ai">
+    <style>
+    /* Single-column dark-panel sign-in. Everything stacked on one
+       full-bleed steel-navy canvas; no grid split, no right panel to
+       collide with. Tokens come from brand.css via --pl-* locals. */
+    body { margin: 0; }
+
+    .np-login {
+      --pl-steel-900: var(--sage-steel-900);
+      --pl-steel-700: var(--sage-steel-700);
+      --pl-steel-500: var(--sage-steel-500);
+      --pl-steel-400: var(--sage-steel-400);
+      --pl-steel-200: var(--sage-steel-200);
+      --pl-pink-600:  var(--sage-pink-600);
+      --pl-pink-500:  var(--sage-pink-500);
+      --pl-pink-700:  var(--sage-pink-700);
+      --pl-ease:      var(--ease-standard);
+
+      min-height: 100vh;
+      min-height: 100dvh;
+      width: 100%;
+      background: var(--pl-steel-900);
+      color: #fff;
+      font-family: var(--font-sans);
+      padding: clamp(28px, 6vw, 64px) clamp(24px, 5vw, 56px);
+      box-sizing: border-box;
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    /* 2×2 dot motif — bottom-right, decorative */
+    .np-login::before {
+      content: "";
+      position: absolute;
+      right: -120px;
+      bottom: -120px;
+      width: clamp(340px, 42%, 520px);
+      aspect-ratio: 1;
+      background:
+        radial-gradient(circle at 25% 25%, var(--pl-pink-600)   0 64px, transparent 65px),
+        radial-gradient(circle at 75% 25%, var(--pl-steel-500)  0 64px, transparent 65px),
+        radial-gradient(circle at 25% 75%, var(--pl-steel-400)  0 64px, transparent 65px),
+        radial-gradient(circle at 75% 75%, var(--pl-pink-600)   0 64px, transparent 65px);
+      opacity: .85;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Subtle vignette for legibility over the motif */
+    .np-login::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 55%, rgba(17,26,46,.55) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .np-login-inner {
+      position: relative;
+      z-index: 2;
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(28px, 5vw, 48px);
+    }
+
+    /* Wordmark */
+    .np-login .wordmark {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      font-size: 20px;
+      color: #fff;
+      text-decoration: none;
+    }
+    .np-login .wordmark .suffix {
+      color: rgba(255, 255, 255, .55);
+      font-size: 0.86em;
+      font-weight: 600;
+    }
+    .np-login .wordmark-dot {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      width: 28px;
+    }
+    .np-login .wordmark-dot > i {
+      display: block;
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+    }
+    .np-login .wordmark-dot > i:nth-child(1) { background: var(--pl-pink-600); }
+    .np-login .wordmark-dot > i:nth-child(2) { background: var(--pl-steel-500); }
+    .np-login .wordmark-dot > i:nth-child(3) { background: var(--pl-steel-400); }
+    .np-login .wordmark-dot > i:nth-child(4) { background: var(--pl-pink-600); }
+
+    /* Eyebrow */
+    .np-login .eyebrow {
+      color: var(--pl-pink-500);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .np-login .eyebrow::before {
+      content: "";
+      width: 22px;
+      height: 1px;
+      background: var(--pl-pink-500);
+    }
+
+    /* Headline */
+    .np-login h1 {
+      font-size: clamp(32px, 5.2vw, 56px);
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      font-weight: 700;
+      margin: 0;
+      color: #fff;
+      text-wrap: balance;
+      /* 20ch accommodates the longest manual line ("in the noise of the",
+         19 characters) without premature wrapping. */
+      max-width: 20ch;
+    }
+    .np-login h1 em {
+      font-style: normal;
+      color: var(--pl-pink-500);
+    }
+
+    /* Sub-copy */
+    .np-login .desc {
+      color: rgba(255, 255, 255, .78);
+      font-size: 15px;
+      line-height: 1.55;
+      margin: 0;
+      max-width: 46ch;
+    }
+
+    /* Actions: Google button + request-access link */
+    .np-login .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .np-login .gbtn {
+      height: 44px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #fff;
+      color: var(--pl-steel-900);
+      border: 1px solid transparent;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 1px 2px rgba(17,26,46,.12);
+      transition: background 120ms var(--pl-ease),
+                  box-shadow 120ms var(--pl-ease),
+                  transform 120ms var(--pl-ease);
+    }
+    .np-login .gbtn:hover {
+      background: #f4f5fa;
+      box-shadow: 0 4px 12px rgba(17,26,46,.22);
+    }
+    .np-login .gbtn:active { transform: translateY(1px); }
+    .np-login .gbtn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(255, 62, 165, .40);
+    }
+    .np-login .gbtn svg { width: 18px; height: 18px; flex: none; }
+
+    .np-login .glink {
+      font-size: 13px;
+      color: var(--pl-pink-500);
+      font-weight: 600;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      padding-bottom: 2px;
+      transition: border-color 120ms var(--pl-ease), color 120ms var(--pl-ease);
+    }
+    .np-login .glink:hover {
+      color: var(--pl-pink-600);
+      border-bottom-color: var(--pl-pink-600);
+    }
+    .np-login .glink:focus-visible {
+      outline: none;
+      border-bottom-color: var(--pl-pink-500);
+      box-shadow: 0 0 0 3px rgba(255, 62, 165, .30);
+      border-radius: 2px;
+    }
+
+    /* Stats strip */
+    .np-login .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 36px 56px;
+      padding-top: 8px;
+    }
+    .np-login .meta .n {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+      font-variant-numeric: tabular-nums lining-nums;
+    }
+    .np-login .meta .n .plus { color: var(--pl-pink-500); }
+    .np-login .meta .l {
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 10px;
+      color: rgba(255, 255, 255, .55);
+      margin-top: 6px;
+    }
+
+    /* Inline flash for auth errors */
+    .np-login .flash {
+      padding: 12px 14px;
+      background: rgba(255, 62, 165, .10);
+      border: 1px solid rgba(255, 62, 165, .35);
+      color: #fff;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.45;
+      font-family: var(--font-mono);
+    }
+
+    /* Fallback login (when Google OAuth env vars are missing) */
+    .np-login .fallback-login {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 360px;
+    }
+    .np-login .fallback-login input {
+      height: 40px;
+      padding: 0 12px;
+      font: inherit;
+      font-size: 14px;
+      color: var(--pl-steel-900);
+      background: #fff;
+      /* Visible border against the white field bg — previously white-on-white. */
+      border: 1px solid var(--pl-steel-200);
+      border-radius: 6px;
+    }
+    .np-login .fallback-login input:focus {
+      outline: none;
+      border-color: var(--pl-pink-600);
+      box-shadow: 0 0 0 3px rgba(255, 62, 165, .30);
+    }
+    .np-login .fallback-login button.gbtn {
+      width: 100%;
+      justify-content: center;
+      background: var(--pl-pink-600);
+      color: #fff;
+    }
+    .np-login .fallback-login button.gbtn:hover {
+      background: var(--pl-pink-700);
+    }
+
+    /* Mobile: relax the motif position so it doesn't crowd content */
+    @media (max-width: 640px) {
+      .np-login::before {
+        right: -80px;
+        bottom: -80px;
+        width: 280px;
+      }
+      .np-login .meta { gap: 24px 32px; }
+      .np-login .meta .n { font-size: 22px; }
+    }
+    @media (max-width: 380px) {
+      .np-login .gbtn { width: 100%; justify-content: center; }
+      .np-login .actions { gap: 14px; }
+      .np-login .actions .glink { width: 100%; text-align: center; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .np-login .gbtn,
+      .np-login .glink { transition: none; }
+    }
+    </style>
+</head>
+<body>
+<section class="np-login" role="main" aria-labelledby="np-login-title">
+  <div class="np-login-inner">
+
+    {# 1. Wordmark #}
+    <a class="wordmark" href="/" aria-label="NonprofitSage.ai — home">
+      <span class="wordmark-dot" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
+      </span>
+      <span>Nonprofit<span style="color: var(--pl-pink-500);">Sage</span><span class="suffix">.ai</span></span>
+    </a>
+
+    {# 2. Eyebrow #}
+    <div class="eyebrow">NonprofitSage.ai</div>
+
+    {# 3. Headline #}
+    <h1 id="np-login-title">Find the <em>signal</em><br>in the noise of the<br>third sector.</h1>
+
+    {# Sub-copy #}
+    <p class="desc">
+      Predictive intelligence built for boards, fundraisers and consultants.
+      We analyse — you decide.
+    </p>
+
+    {# Error flash — keys match api/routers/auth.py redirects. #}
+    {% if request.query_params.get('error') %}
+      <div class="flash" role="alert">
+        {% set err = request.query_params.get('error') %}
+        {% if err == 'access_denied' %}
+          {% set denied_email = request.query_params.get('email', '') %}
+          {% if denied_email %}
+            The account <strong>{{ denied_email }}</strong> isn't on the whitelist. Request access below and we'll add you.
+          {% else %}
+            That address isn't on the whitelist. Request access below and we'll add you.
+          {% endif %}
+        {% elif err == 'no_email' %}
+          Google didn't return an email for that account — try again with a different sign-in method.
+        {% elif err == 'oauth_not_configured' %}
+          Google sign-in isn't set up on this environment. Use the username and password below, or email tim@ferntalent.com.
+        {% elif err == 'auth_failed' %}
+          Something went wrong signing you in. Try again, or request access if this persists.
+        {% else %}
+          Something went wrong signing you in. Try again, or request access if this persists.
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {# 4. Sign-in action row #}
+    <div class="actions">
+      {% if oauth_configured %}
+      <a class="gbtn" href="/auth/google" rel="nofollow">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.4-1.6 4.1-5.5 4.1-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.2.8 3.9 1.5l2.7-2.6C17 3.1 14.8 2 12 2 6.9 2 2.7 6.2 2.7 11.3S6.9 20.6 12 20.6c6.9 0 9.5-4.8 9.5-7.3 0-.5-.1-.9-.1-1.2L12 10.2z"/>
+          <path fill="#34A853" d="M3.9 7.3l3.2 2.4C8 7.7 9.9 6.2 12 6.2c1.9 0 3.2.8 3.9 1.5l2.7-2.6C17 3.1 14.8 2 12 2 8.1 2 4.8 4.1 3.9 7.3z"/>
+          <path fill="#FBBC05" d="M12 20.6c2.8 0 5-0.9 6.6-2.5l-3-2.5c-.8.6-2 1-3.6 1-2.8 0-5.1-1.8-5.9-4.3l-3.2 2.5C4.8 17.9 8.1 20.6 12 20.6z"/>
+          <path fill="#4285F4" d="M21.4 12.3c0-.5-.1-.9-.1-1.2H12v3.9h5.5c-.3 1-.9 1.9-1.9 2.6l3 2.5c1.8-1.7 2.8-4.2 2.8-7.8z"/>
+        </svg>
+        <span>Sign in with Google</span>
+      </a>
+      {% else %}
+      <form class="fallback-login" onsubmit="doLogin(event)">
+        <input type="text" id="login-user" name="username" placeholder="Username" autocomplete="username" required>
+        <input type="password" id="login-pass" name="password" placeholder="Password" autocomplete="current-password" required>
+        <button type="submit" class="gbtn">Sign in</button>
+        <p id="login-msg" class="flash" role="alert" hidden></p>
+      </form>
+      {% endif %}
+      <a class="glink" href="mailto:tim@ferntalent.com?subject=NonprofitSage.ai%20access%20request">
+        Request access
+      </a>
+    </div>
+
+    {# 5. Stats #}
+    <div class="meta" aria-label="Platform statistics">
+      <div>
+        <div class="n">30,000<span class="plus">+</span></div>
+        <div class="l">UK organisations</div>
+      </div>
+      <div>
+        <div class="n">150,000<span class="plus">+</span></div>
+        <div class="l">Data points / day</div>
+      </div>
+      <div>
+        <div class="n">24/7</div>
+        <div class="l">Live monitoring</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+{% if not oauth_configured %}
+<script>
+function doLogin(ev) {
+  ev.preventDefault();
+  var user = document.getElementById('login-user').value;
+  var pass = document.getElementById('login-pass').value;
+  var fd = new FormData();
+  fd.append('username', user);
+  fd.append('password', pass);
+  fetch('/api/login', { method: 'POST', body: fd })
+    .then(function (r) { if (r.ok) return r.json(); throw new Error('Invalid'); })
+    .then(function () { window.location.href = '/jobs'; })
+    .catch(function () {
+      var msg = document.getElementById('login-msg');
+      msg.textContent = 'Invalid credentials.';
+      msg.hidden = false;
+    });
+}
+</script>
+{% endif %}
+</body>
+</html>

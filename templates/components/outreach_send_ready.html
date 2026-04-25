@@ -1,0 +1,36 @@
+{# Phase 4: final state after /api/outreach/finalise. The outreach_event is
+   already logged; this fragment just gives the consultant a clean one-click
+   link to open Gmail compose in a new tab. #}
+<div class="outreach-drawer-sent" id="outreach-sent-{{ event_id }}"
+     style="margin-top:8px;padding:12px;border:1px solid var(--green);border-radius:8px;background:var(--green-soft);">
+
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="color:var(--green);font-size:16px;font-weight:700;">&#10003;</span>
+    <div style="flex:1;">
+      <div style="font-weight:700;color:var(--text-primary);font-size:12.5px;">
+        Ready to send{% if contact_name %} to {{ contact_name }}{% endif %}
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);">
+        Logged in outreach history{% if attachment_filename %} &middot; {{ attachment_filename }}{% endif %}
+      </div>
+    </div>
+    <a class="btn-primary"
+       href="{{ gmail_url }}"
+       target="_blank" rel="noopener"
+       style="font-size:12px;padding:5px 14px;text-decoration:none;">
+      Open in Gmail
+    </a>
+    <button type="button"
+            class="btn-ghost"
+            style="font-size:11px;padding:2px 8px;border:1px solid var(--border);background:var(--surface);border-radius:6px;color:var(--text-muted);cursor:pointer;"
+            onclick="this.closest('.outreach-drawer-sent').remove();">
+      Done
+    </button>
+  </div>
+
+  {% if warn %}
+  <div style="margin-top:8px;color:var(--amber);font-size:11px;">
+    &#9888; {{ warn }}
+  </div>
+  {% endif %}
+</div>

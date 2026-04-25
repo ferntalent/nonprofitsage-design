@@ -1,0 +1,81 @@
+{% set briefings = dossier.get('briefings', []) %}
+{% set sections = grouped_sections if grouped_sections is defined else dossier.get('grouped_sections', []) %}
+
+<article class="dossier-panel">
+    <header style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 class="ds-label" style="margin:0;">Brief</h3>
+        <button class="btn-secondary"
+                hx-post="/api/org/{{ org_id }}/panel/brief/regenerate"
+                hx-target="closest article"
+                hx-swap="outerHTML"
+                hx-indicator="closest article">
+            &#x21bb; Regenerate
+        </button>
+    </header>
+
+    {# Show opportunity-level pitch and why_now first #}
+    {% if opp %}
+        {% if opp.get('pitch_angle') %}
+        <p class="pitch"><strong>Pitch:</strong> {{ opp['pitch_angle'] | extract_bullet }}</p>
+        {% endif %}
+        {% if opp.get('why_now') %}
+        <p class="why-now"><strong>Why now:</strong> {{ opp['why_now'] | extract_bullet }}</p>
+        {% endif %}
+    {% endif %}
+
+    {# Show briefing bullets grouped by section (pre-computed in Python) #}
+    {% if sections %}
+    <div class="briefing-bullets">
+        {% for sec in sections %}
+            <h4>{{ sec.label }}</h4>
+            <ul>
+                {% for text in sec.bullets %}
+                    <li>{{ text }}</li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+
+        {# Gemini summaries from briefing records #}
+        {% for b in briefings %}
+            {% if b.get('gemini_summary') %}
+            <blockquote>{{ b['gemini_summary'] }}</blockquote>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% elif not opp or (not opp.get('pitch_angle') and not opp.get('why_now')) %}
+    <p class="panel-empty">No briefing data available for this organisation.</p>
+    {% endif %}
+</article>
+<script>
+// Convert decimal metric values to percentages in briefing bullets
+document.querySelectorAll('.briefing-bullets li').forEach(li => {
+    li.textContent = li.textContent
+        // "Margin is 0.013 versus peer median 0.018" -> "Margin is 1.3% versus peer median 1.8%"
+        .replace(/(\b(?:Margin|margin|CAGR|cagr|growth|reliance|Legacy gap proxy|Fundraising ROI)\b[^.]*?) ([\-]?0\.\d{1,4}) (versus peer median) ([\-]?0\.\d{1,4})/gi, 
+            function(match, prefix, val1, mid, val2) {
+                var v1 = (parseFloat(val1) * 100).toFixed(1) + '%';
+                var v2 = (parseFloat(val2) * 100).toFixed(1) + '%';
+                return prefix + ' ' + v1 + ' ' + mid + ' ' + v2;
+            })
+        // "Margin is 0.013" standalone
+        .replace(/(\b(?:Margin|CAGR|growth)\b[^.]*?) is ([\-]?0\.\d{1,4}) /gi,
+            function(match, prefix, val) {
+                return prefix + ' is ' + (parseFloat(val) * 100).toFixed(1) + '% ';
+            })
+        // Fix "Income growth 3yr CAGR is 0.120" -> "Income growth 3yr CAGR is 12.0%"
+        .replace(/CAGR is ([\-]?0\.\d{1,4})/gi,
+            function(match, val) {
+                return 'CAGR is ' + (parseFloat(val) * 100).toFixed(1) + '%';
+            })
+        // "Statutory reliance is 98.960" -> "Statutory reliance is 99.0%"
+        .replace(/([Ss]tatutory reliance) is (\d{1,3}\.\d+)/g,
+            function(match, prefix, val) {
+                return prefix + ' is ' + parseFloat(val).toFixed(1) + '%';
+            })
+        // Same for peer median version
+        .replace(/([Ss]tatutory reliance[^.]*?) (\d{1,3}\.\d+) (versus peer median) (\d{1,3}\.\d+)/g,
+            function(match, prefix, val1, mid, val2) {
+                return prefix + ' ' + parseFloat(val1).toFixed(1) + '% ' + mid + ' ' + parseFloat(val2).toFixed(1) + '%';
+            });
+});
+</script>

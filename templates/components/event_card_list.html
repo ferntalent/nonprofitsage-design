@@ -1,0 +1,119 @@
+{% if items %}
+<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">Showing {{ items|length }} result{{ 's' if items|length != 1 else '' }} ({{ events_count }} event{{ 's' if events_count != 1 else '' }}, {{ anniversaries_count }} milestone{{ 's' if anniversaries_count != 1 else '' }})</div>
+{% for item in items %}
+{% if item.item_type == 'event' %}
+{# ── Event Card ── #}
+<div class="ev-card {% if item.est_roi == 'Very High' %}roi-veryhigh{% elif item.est_roi == 'High' %}roi-high{% elif item.est_roi == 'Medium' %}roi-medium{% else %}roi-low{% endif %}">
+  <div class="ev-org-row">
+    {% if item.website %}
+    <img src="https://www.google.com/s2/favicons?domain={{ item.website|replace('https://','')|replace('http://','')|replace('www.','')|replace('/','') }}&sz=64" alt="" class="ev-favicon" onerror="this.outerHTML='<span class=ev-favicon-fb>{{ item.org_name[:1] }}</span>'">
+    {% else %}
+    <span class="ev-favicon-fb">{{ item.org_name[:1] }}</span>
+    {% endif %}
+    {% if item.org_id %}
+    <a href="/org/{{ item.org_id }}" class="ev-org-name">{{ item.org_name|smart_org }}</a>
+    {% else %}
+    <span class="ev-org-name">{{ item.org_name|smart_org }}</span>
+    {% endif %}
+    {% if item.est_roi %}
+    <span class="ev-badge ev-badge-roi-{{ item.est_roi|lower|replace(' ', '') }}">{{ item.est_roi }}</span>
+    {% endif %}
+    {% if item.readiness_score is defined and item.readiness_score is not none and item.readiness_score >= 0 %}
+    <span class="ev-readiness-badge ev-rs-{{ 'hot' if item.readiness_score >= 80 else ('warm' if item.readiness_score >= 50 else 'cool') }}">{{ item.readiness_score }}</span>
+    {% endif %}
+  </div>
+  <div class="ev-title">
+    {{ item.event_name }}{% if item.event_date and item.event_date != 'None' and item.event_date != '' %} — {{ item.event_date }}{% endif %}{% if item.location %}, {{ item.location }}{% endif %}
+  </div>
+  <div class="ev-meta">
+    {% if item.event_started_year and item.event_started_year != 'None' %}Annual since {{ item.event_started_year }}<span class="sep">·</span>{% endif %}
+    {% if item.amount_raised %}Est. raised: £{{ '{:,.0f}'.format(item.amount_raised) }}<span class="sep">·</span>{% endif %}
+    {% if item.income_display %}Income: {{ item.income_display }}{% endif %}
+    {% if item.amount_notes and item.amount_notes != 'None' %}<span class="sep">·</span>{{ item.amount_notes }}{% endif %}
+  </div>
+  {# Brand staleness heuristic: events running 5+ years may need a refresh #}
+  {% set _started = item.event_started_year|string %}
+  {% if _started and _started|length == 4 and _started.isdigit() and (2026 - _started|int) >= 5 %}
+  <div style="margin-top:0.35rem;font-size:0.72rem;color:#92400e;background:#fef6e6;padding:0.25rem 0.5rem;border-radius:4px;display:inline-block;">
+    Consider refreshing the event brand — {{ 2026 - _started|int }} years in
+  </div>
+  {% endif %}
+  {% if item.loxo_roles %}
+  <div class="ev-loxo-row">
+    👤
+    {% set found_roles = item.loxo_roles|selectattr("status", "equalto", "found")|list %}
+    {% set vacant_roles = item.loxo_roles|selectattr("status", "equalto", "not_found")|list %}
+    {% if found_roles %}{% for r in found_roles[:3] %}{{ r.contact_name }} ({{ r.role_searched }}){% if not loop.last %} · {% endif %}{% endfor %}{% endif %}
+    {% if vacant_roles %}{% if found_roles %} · {% endif %}<span class="vacant">{{ vacant_roles|length }} key role{{ 's' if vacant_roles|length != 1 }} vacant</span>{% endif %}
+  </div>
+  {% endif %}
+  <div class="ev-actions">
+    {% if item.org_id %}<a href="/org/{{ item.org_id }}" class="ev-act">View Report</a>{% endif %}
+    {% if item.org_id %}
+    <button class="ev-act ev-pitch-btn"
+            hx-post="/events/pitch/{{ item.org_id }}"
+            hx-target="#pitch-{{ item.org_id }}-{{ loop.index }}"
+            hx-swap="innerHTML"
+            hx-vals='{{ {"item_type": item.item_type, "event_name": item.event_name|default(item.org_name, true), "org_name": item.org_name, "readiness_score": item.readiness_score|default(-1)|string}|tojson }}'>📧 Draft Pitch</button>
+    {% endif %}
+  </div>
+  <div id="pitch-{{ item.org_id }}-{{ loop.index }}"></div>
+  {% if item.readiness_score is defined and item.readiness_score is not none and item.readiness_score >= 0 %}
+  <div class="ev-readiness-bar"><div style="width:{{ item.readiness_score }}%;"></div></div>
+  {% endif %}
+</div>
+{% else %}
+{# ── Anniversary Card ── #}
+<div class="ev-card {% if item.milestone_type in ('centenary', 'bicentenary', 'historic') %}ms-centenary{% elif item.milestone_type == 'gold' %}ms-gold{% elif item.milestone_type == 'diamond' %}ms-diamond{% elif item.milestone_type == 'platinum' %}ms-platinum{% elif item.milestone_type == 'ruby' %}ms-ruby{% elif item.milestone_type == 'silver' %}ms-silver{% else %}ms-minor{% endif %}">
+  <div class="ev-org-row">
+    {% if item.website %}
+    <img src="https://www.google.com/s2/favicons?domain={{ item.website|replace('https://','')|replace('http://','')|replace('www.','')|replace('/','') }}&sz=64" alt="" class="ev-favicon" onerror="this.outerHTML='<span class=ev-favicon-fb>{{ item.org_name[:1] }}</span>'">
+    {% else %}
+    <span class="ev-favicon-fb">{{ item.org_name[:1] }}</span>
+    {% endif %}
+    {% if item.org_id %}
+    <a href="/org/{{ item.org_id }}" class="ev-org-name">{{ item.org_name|smart_org }}</a>
+    {% else %}
+    <span class="ev-org-name">{{ item.org_name|smart_org }}</span>
+    {% endif %}
+    <span class="ev-badge ev-badge-ms-{{ item.milestone_type }}">{{ item.milestone_type|title }}{% if item.milestone_type in ('centenary', 'bicentenary', 'historic') %} ({{ item.milestone_age }}yr){% endif %}</span>
+    {% if item.readiness_score is defined and item.readiness_score is not none and item.readiness_score >= 0 %}
+    <span class="ev-readiness-badge ev-rs-{{ 'hot' if item.readiness_score >= 80 else ('warm' if item.readiness_score >= 50 else 'cool') }}">{{ item.readiness_score }}</span>
+    {% endif %}
+  </div>
+  <div class="ev-title">
+    {{ item.milestone_age }}{{ 'st' if item.milestone_age == 1 else ('nd' if item.milestone_age == 2 else ('rd' if item.milestone_age == 3 else 'th')) }} Anniversary (est. {{ item.year_established }})
+  </div>
+  <div class="ev-meta">
+    {% if item.income_display %}Income: {{ item.income_display }}{% endif %}
+    {% if item.milestone_age >= 50 %}<span class="sep">·</span>Likely capital campaign or gala{% endif %}
+  </div>
+  {% if item.loxo_roles %}
+  <div class="ev-loxo-row">
+    👤
+    {% set found_roles = item.loxo_roles|selectattr("status", "equalto", "found")|list %}
+    {% set vacant_roles = item.loxo_roles|selectattr("status", "equalto", "not_found")|list %}
+    {% if found_roles %}{% for r in found_roles[:3] %}{{ r.contact_name }} ({{ r.role_searched }}){% if not loop.last %} · {% endif %}{% endfor %}{% endif %}
+    {% if vacant_roles %}{% if found_roles %} · {% endif %}<span class="vacant">{{ vacant_roles|length }} key role{{ 's' if vacant_roles|length != 1 }} vacant</span>{% endif %}
+  </div>
+  {% endif %}
+  <div class="ev-actions">
+    {% if item.org_id %}<a href="/org/{{ item.org_id }}" class="ev-act">View Report</a>{% endif %}
+    {% if item.org_id %}
+    <button class="ev-act ev-pitch-btn"
+            hx-post="/events/pitch/{{ item.org_id }}"
+            hx-target="#pitch-{{ item.org_id }}-{{ loop.index }}"
+            hx-swap="innerHTML"
+            hx-vals='{{ {"item_type": item.item_type, "event_name": (item.milestone_age|string ~ "th Anniversary"), "org_name": item.org_name, "readiness_score": item.readiness_score|default(-1)|string}|tojson }}'>📧 Draft Pitch</button>
+    {% endif %}
+  </div>
+  <div id="pitch-{{ item.org_id }}-{{ loop.index }}"></div>
+  {% if item.readiness_score is defined and item.readiness_score is not none and item.readiness_score >= 0 %}
+  <div class="ev-readiness-bar"><div style="width:{{ item.readiness_score }}%;"></div></div>
+  {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+{% else %}
+<div class="ev-empty">No events or anniversaries match this filter.</div>
+{% endif %}

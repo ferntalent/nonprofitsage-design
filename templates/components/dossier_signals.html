@@ -1,0 +1,100 @@
+{% set triggers = dossier.get('triggers', []) %}
+{% set trigger_narratives = dossier.get('trigger_narratives', []) %}
+{% set flagged_signals = dossier.get('flagged_signals', []) %}
+{% set confirmed_signals = dossier.get('confirmed_signals', []) %}
+
+{# Sort: move website_refresh_needed to the bottom regardless of severity #}
+{% set primary_signals = [] %}
+{% set digital_signals = [] %}
+{% for t in trigger_narratives %}
+    {% set tt = t.get('trigger_type', '') or (t.label | lower | replace(' ', '_')) %}
+    {% if tt in ('website_refresh_needed', 'website_refresh', 'digital_maturity_signal') %}
+        {% set _ = digital_signals.append(t) %}
+    {% else %}
+        {% set _ = primary_signals.append(t) %}
+    {% endif %}
+{% endfor %}
+{% set sorted_narratives = primary_signals + digital_signals %}
+
+<article class="dossier-panel">
+    <header><h3 class="ds-label" style="margin:0;">Key Signals</h3></header>
+    {% if sorted_narratives %}
+    <ul class="signal-narratives">
+        {% for t in sorted_narratives[:10] %}
+        {% set trigger_type = t.get('trigger_type', '') or (t.label | lower | replace(' ', '_')) %}
+        {% set is_flagged = trigger_type in flagged_signals %}
+        {% set is_confirmed = trigger_type in confirmed_signals %}
+        {% set is_digital = trigger_type in ('website_refresh_needed', 'website_refresh', 'digital_maturity_signal') %}
+        <li class="{% if is_flagged %}signal-flagged{% endif %}{% if is_confirmed %} signal-confirmed{% endif %}{% if is_digital %} signal-digital{% endif %}">
+            <div class="signal-row">
+                <div>
+                    <strong>{{ t.label }}</strong>
+                    {%- if t.severity_label %} <span class="badge {% if t.severity_label == 'critical' %}badge-hot{% elif t.severity_label == 'warning' %}badge-warm{% else %}badge-monitor{% endif %}">{{ t.severity_label }}</span>{% endif %}:
+                    {{ t.narrative }}
+                    {% if is_digital and not is_confirmed %}
+                    <em class="text-muted"> (automated scan — may not reflect current state)</em>
+                    {% endif %}
+                    {% if is_confirmed %}
+                    <em class="text-confirmed"> — confirmed by user</em>
+                    {% elif is_flagged %}
+                    <em class="text-muted"> — flagged as incorrect</em>
+                    {% endif %}
+                </div>
+                {% if not is_flagged and not is_confirmed %}
+                <span class="signal-actions">
+                    {% if is_digital %}
+                    <button class="btn-primary flag-signal-btn"
+                            hx-post="/api/triage/{{ org_id }}/flag-signal"
+                            hx-vals='{"trigger_type": "{{ trigger_type }}", "reason": "confirmed"}'
+                            hx-target="closest li"
+                            hx-swap="outerHTML"
+                            title="Confirm this issue is real">
+                        &#x2713; Confirm issue
+                    </button>
+                    <button class="btn-ghost flag-signal-btn"
+                            hx-post="/api/triage/{{ org_id }}/flag-signal"
+                            hx-vals='{"trigger_type": "{{ trigger_type }}", "reason": "false_positive"}'
+                            hx-target="closest li"
+                            hx-swap="outerHTML"
+                            title="Mark as false positive">
+                        &#x2717; False positive
+                    </button>
+                    {% else %}
+                    <button class="btn-ghost flag-signal-btn"
+                            hx-post="/api/triage/{{ org_id }}/flag-signal"
+                            hx-vals='{"trigger_type": "{{ trigger_type }}", "reason": "false_positive"}'
+                            hx-target="closest li"
+                            hx-swap="outerHTML"
+                            title="Flag this signal as incorrect">
+                        &#x2691; Flag
+                    </button>
+                    {% endif %}
+                </span>
+                {% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% if trigger_narratives|length > 10 %}
+    <p class="panel-note">Showing top 10 of {{ trigger_narratives|length }} signals</p>
+    {% endif %}
+    {% elif triggers %}
+    {# Fallback: render raw triggers if narratives weren't pre-computed #}
+    <ul>
+        {% for t in triggers[:10] %}
+        <li>
+            <strong>{{ trigger_display_names.get(t.get('trigger_type', ''), (t.get('trigger_type', '') | string) | replace('_', ' ') | title) }}</strong>
+            {% set sev_raw = t.get('trigger_severity', 0) %}
+            {% set sev = sev_raw if sev_raw is number else 0 %}
+            <span class="severity severity-{% if sev >= 70 %}high{% elif sev >= 40 %}med{% else %}low{% endif %}">
+                ({{ "%.0f"|format(sev) }})
+            </span>:
+            {% set reasons = t.get('reasons', '') | string %}
+            {{ reasons[:200] if reasons and reasons != 'None' and reasons != 'nan' else 'Signal detected.' }}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="panel-empty">No active signals found for this organisation.</p>
+    {% endif %}
+</article>

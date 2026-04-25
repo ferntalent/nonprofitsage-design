@@ -1,0 +1,152 @@
+{# Sticky quick-action bar below the header — jump to report builder, enrich, Loxo. #}
+<div class="dossier-quick-actions">
+    <style>
+        .dossier-quick-actions {
+            position: sticky;
+            top: 48px;
+            z-index: 20;
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            margin: 10px 0 16px;
+            background: var(--surface, #fff);
+            border: 1px solid var(--border, #e2e6ec);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .dqa-btn {
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            border: 1.5px solid var(--border, #e2e6ec);
+            background: var(--surface, #fff);
+            color: var(--text-primary, #1a2332);
+            font-family: 'Open Sans', sans-serif;
+        }
+        .dqa-btn:hover { border-color: var(--navy, #0d1f2d); color: var(--navy, #0d1f2d); }
+        .dqa-btn-primary {
+            background: var(--navy, #0d1f2d);
+            border-color: var(--navy, #0d1f2d);
+            color: #fff;
+        }
+        .dqa-btn-primary:hover { background: #1a3347; color: #fff; }
+        .dqa-btn-pink {
+            background: var(--pink, #FF4FBE);
+            border-color: var(--pink, #FF4FBE);
+            color: #fff;
+        }
+        .dqa-btn-pink:hover { background: #e5459c; color: #fff; }
+        .dqa-btn-coral {
+            background: #E8734A;
+            border-color: #E8734A;
+            color: #fff;
+            font-size: 13px;
+            padding: 8px 18px;
+        }
+        .dqa-btn-coral:hover { background: #d35f37; color: #fff; }
+        .dqa-report-status { font-size: 11px; color: var(--text-muted, #8c95a6); margin-left: 4px; }
+        .dqa-report-status a { color: #1B4D4D; text-decoration: underline; font-weight: 600; }
+        .dqa-report-status a:hover { color: #E8734A; }
+        .dqa-label { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-muted, #8c95a6); margin-right: 4px; }
+        .dqa-toast {
+            display: none;
+            font-size: 11.5px;
+            color: var(--green, #15803d);
+            margin-left: auto;
+            max-width: 340px;
+            line-height: 1.35;
+        }
+        .dqa-toast.show { display: inline-block; }
+        .dqa-toast.error { color: var(--red, #dc2626); }
+    </style>
+
+    <span class="dqa-label">Quick actions</span>
+
+    {# AI Enriched research dossier — all hub data on this org in one
+       editable Word document, with Haiku-generated additional context at the
+       end. Editable by the user, not a consultancy pitch. Cached per-day.
+
+       Generation is slow (~30–60s first time each day) and runs synchronously,
+       so we show an inline "Generating…" label on click and disable the button
+       until the browser receives the download. #}
+    <a class="dqa-btn dqa-btn-coral"
+       id="dqa-ai-enriched-btn"
+       href="/api/org/{{ org_id }}/enriched-report.docx"
+       title="Download a factual research dossier compiling everything the hub knows about this org, plus Haiku-generated sector context. Editable Word doc. First generation takes up to a minute."
+       onclick="(function(btn){
+           if (btn.dataset.loading === '1') { return; }
+           btn.dataset.loading = '1';
+           btn.dataset.orig = btn.textContent;
+           btn.textContent = 'Generating — takes ~30–60s…';
+           btn.style.opacity = '0.7';
+           btn.style.pointerEvents = 'none';
+           // Re-enable when the browser starts the download (fires shortly
+           // after the response arrives) or as a safety fallback after 90s.
+           var reset = function(){
+               if (btn.dataset.loading !== '1') return;
+               btn.dataset.loading = '0';
+               btn.textContent = btn.dataset.orig || 'AI Enriched';
+               btn.style.opacity = '';
+               btn.style.pointerEvents = '';
+           };
+           window.addEventListener('pagehide', reset, { once: true });
+           window.addEventListener('blur', reset, { once: true });
+           setTimeout(reset, 90000);
+       })(this);">
+        AI Enriched
+    </a>
+    <a class="dqa-btn"
+       href="/api/org/{{ org_id }}/enriched-report/gmail-compose"
+       title="Open Gmail compose with a pre-filled intro email and a download link for the dossier"
+       style="border-color:#1B4D4D;color:#1B4D4D;">
+        Send via Gmail
+    </a>
+    {% if enriched_report_info %}
+    <span class="dqa-report-status">
+      Last generated: {{ enriched_report_info.generated_on.strftime("%-d %b %Y") }}
+      &middot;
+      <a href="/api/org/{{ org_id }}/enriched-report.docx?regenerate=1"
+         title="Force a fresh Haiku + chart rebuild, even if today's file is cached">Regenerate</a>
+    </span>
+    {% endif %}
+
+    <button class="dqa-btn dqa-btn-primary"
+            type="button"
+            hx-post="/api/internal/enrich-contacts-one"
+            hx-vals='{"org_id": "{{ org_id }}"}'
+            hx-swap="none"
+            hx-on::after-request="(function(evt){
+                var t = document.getElementById('dqa-toast');
+                if (!t) return;
+                if (evt.detail && evt.detail.successful) {
+                    t.textContent = 'Enriching now — check back in 2 minutes. Refresh this page to see new contacts.';
+                    t.classList.remove('error');
+                } else {
+                    t.textContent = 'Could not queue enrichment. Check logs/derrick_enrich.log and try again.';
+                    t.classList.add('error');
+                }
+                t.classList.add('show');
+                setTimeout(function(){ t.classList.remove('show'); }, 8000);
+            })(event)"
+            title="Ask Derrick to pull fresh contacts for this organisation (runs in the background, takes 1-2 minutes)">
+        Enrich Contacts
+    </button>
+
+    {% set org_name = (master.get('org_name', org_id) or org_id) | smart_org %}
+    <a class="dqa-btn"
+       target="_blank" rel="noopener"
+       href="https://fern-talent.app.loxo.co/agencies/40830/companies?query={{ org_name | urlencode }}"
+       title="Open the matching company in Loxo">
+        View in Loxo
+    </a>
+
+    <span class="dqa-toast" id="dqa-toast"></span>
+</div>

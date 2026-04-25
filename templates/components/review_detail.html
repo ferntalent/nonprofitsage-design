@@ -1,0 +1,201 @@
+{# Review detail panel — loaded via HTMX into #review-detail-panel #}
+{% set item_id = item.get('item_id', '') %}
+{% set category = item.get('category', '') %}
+{% set org_name = item.get('org_name', 'Unknown') %}
+{% set org_id = item.get('org_id', '') %}
+{% set title = item.get('title', '') %}
+{% set detail = item.get('detail', '') %}
+{% set source_value = item.get('source_value', '') %}
+{% set suggested_value = item.get('suggested_value', '') %}
+{% set source_url = item.get('source_url', '') %}
+{% set flagged_at = item.get('flagged_at', '') %}
+{% set safe_id = item_id|replace(':', '-')|replace(' ', '-') %}
+
+{% if category == 'salary_anomaly' %}{% set cat_label = "Salary Anomaly" %}{% set cat_cls = "jc-badge-warm" %}
+{% elif category == 'guess_charity_unconfirmed' %}{% set cat_label = "Unconfirmed Guess" %}{% set cat_cls = "jc-badge-fixed" %}
+{% elif category == 'org_match_ambiguous' %}{% set cat_label = "Ambiguous Org Match" %}{% set cat_cls = "jc-badge-hot" %}
+{% elif category == 'contract_type_uncertain' %}{% set cat_label = "Contract Type Uncertain" %}{% set cat_cls = "jc-badge-agency" %}
+{% elif category == 'scrape_error_high_value' %}{% set cat_label = "Scrape Error (High Value)" %}{% set cat_cls = "jc-badge-readvert" %}
+{% elif category == 'digital_failure' %}{% set cat_label = "Data Quality Issue" %}{% set cat_cls = "jc-badge-also" %}
+{% else %}{% set cat_label = category %}{% set cat_cls = "jc-badge-func" %}
+{% endif %}
+
+<div class="detail-card">
+
+  {# -- ORG HEADER -- #}
+  <div class="review-detail-header">
+    <div class="review-detail-initials">{{ org_name[:1] }}</div>
+    <div class="review-detail-org-info">
+      <div class="review-detail-org-name">
+        {% if org_id %}
+          <a href="/org/{{ org_id }}">{{ org_name | smart_org }}</a>
+        {% else %}
+          {{ org_name | smart_org }}
+        {% endif %}
+      </div>
+      {% if flagged_at %}
+      <div class="review-detail-date">Flagged {{ flagged_at[:10] }}</div>
+      {% endif %}
+    </div>
+    <span class="jc-badge {{ cat_cls }}">{{ cat_label }}</span>
+  </div>
+
+  {# -- ITEM TITLE -- #}
+  <div class="ds-label">Item</div>
+  <div class="review-detail-title">
+    {% if source_url %}
+      <a href="{{ source_url }}" target="_blank" rel="noopener">{{ title }}</a>
+    {% else %}
+      {{ title }}
+    {% endif %}
+  </div>
+
+  {# -- DESCRIPTION -- #}
+  {% if detail %}
+  <div class="ds-label">Description</div>
+  <div class="review-detail-desc">{{ detail }}</div>
+  {% endif %}
+
+  {# -- CURRENT vs SUGGESTED -- #}
+  {% if source_value or suggested_value %}
+  <div class="ds-label">Values</div>
+  <div class="review-detail-values">
+    {% if source_value %}
+    <div class="review-detail-value-item">
+      <span class="review-detail-value-key">Current</span>
+      <span class="review-detail-value-current">{{ source_value }}</span>
+    </div>
+    {% endif %}
+    {% if suggested_value %}
+    <div class="review-detail-value-item">
+      <span class="review-detail-value-key">Suggested</span>
+      <span class="review-detail-value-suggested">{{ suggested_value }}</span>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# -- SOURCE LINK -- #}
+  {% if source_url %}
+  <div class="ds-label">Source</div>
+  <div class="link-row">
+    <a href="{{ source_url }}" target="_blank" rel="noopener" class="link-pill">View Original</a>
+    {% if org_id %}
+    <a href="/org/{{ org_id }}" class="link-pill">Org Report</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# -- CORRECTION INPUTS -- #}
+  <div class="ds-label">Corrections</div>
+  <div class="review-detail-corrections" id="review-corrections-{{ safe_id }}">
+    <div class="review-detail-correction-row">
+      <label class="review-detail-correction-label" for="corr-salary-{{ safe_id }}">Salary</label>
+      <input type="text" id="corr-salary-{{ safe_id }}" class="review-detail-correction-input"
+             placeholder="e.g. 35,000 - 42,000" form="correct-form-{{ safe_id }}" name="corrected_value">
+    </div>
+    <div class="review-detail-correction-row">
+      <label class="review-detail-correction-label" for="corr-location-{{ safe_id }}">Location</label>
+      <input type="text" id="corr-location-{{ safe_id }}" class="review-detail-correction-input"
+             placeholder="e.g. London" form="correct-form-{{ safe_id }}" name="corrected_location">
+    </div>
+    <div class="review-detail-correction-row">
+      <label class="review-detail-correction-label" for="corr-contract-{{ safe_id }}">Contract</label>
+      <input type="text" id="corr-contract-{{ safe_id }}" class="review-detail-correction-input"
+             placeholder="e.g. Fixed Term, Permanent" form="correct-form-{{ safe_id }}" name="corrected_contract">
+    </div>
+  </div>
+
+  {# -- ACTIONS -- #}
+  <div class="ds-label">Decision</div>
+  <div class="review-detail-actions">
+    <form hx-post="/admin/review/{{ item_id }}/decide" hx-target="#ar-{{ safe_id }}" hx-swap="outerHTML">
+      <input type="hidden" name="decision" value="approve">
+      <button type="submit" class="review-btn review-btn-approve"
+              title="Confirm the current data is correct — no change needed">Looks fine</button>
+    </form>
+    <form id="correct-form-{{ safe_id }}" hx-post="/admin/review/{{ item_id }}/decide" hx-target="#ar-{{ safe_id }}" hx-swap="outerHTML">
+      <input type="hidden" name="decision" value="correct">
+      <button type="submit" class="review-btn review-btn-correct"
+              title="Overwrite the flagged field with the value you've entered above">Save correction</button>
+    </form>
+    <form hx-post="/admin/review/{{ item_id }}/decide" hx-target="#ar-{{ safe_id }}" hx-swap="outerHTML">
+      <input type="hidden" name="decision" value="dismiss">
+      <button type="submit" class="review-btn review-btn-dismiss"
+              title="The flag was spurious — ignore and never show again">Not a real issue</button>
+    </form>
+  </div>
+
+</div>
+
+<style>
+/* Review detail — scoped styles */
+.review-detail-header {
+  display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px;
+}
+.review-detail-initials {
+  width: 40px; height: 40px; border-radius: 8px;
+  background: var(--steel-soft); color: var(--steel);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 16px; flex-shrink: 0;
+}
+.review-detail-org-info { flex: 1; min-width: 0; }
+.review-detail-org-name {
+  font-size: 18px; font-weight: 700; color: var(--navy); line-height: 1.3;
+}
+.review-detail-org-name a { color: var(--navy); text-decoration: none; }
+.review-detail-org-name a:hover { color: var(--steel); }
+.review-detail-date {
+  font-size: 12px; color: var(--text-secondary); margin-top: 2px;
+}
+.review-detail-title {
+  font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;
+}
+.review-detail-title a { color: var(--text-primary); text-decoration: none; }
+.review-detail-title a:hover { text-decoration: underline; }
+.review-detail-desc {
+  font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 8px;
+}
+.review-detail-values {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg); border-radius: 8px; padding: 14px 16px; margin-bottom: 8px;
+}
+.review-detail-value-item {
+  display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-primary);
+}
+.review-detail-value-key {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-muted); min-width: 80px;
+}
+.review-detail-value-current { font-weight: 600; }
+.review-detail-value-suggested { font-weight: 700; color: var(--green); }
+.review-detail-corrections {
+  display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;
+}
+.review-detail-correction-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.review-detail-correction-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-muted); min-width: 80px;
+}
+.review-detail-correction-input {
+  flex: 1; font-size: 12px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text-primary);
+}
+.review-detail-actions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.review-btn {
+  border: none; border-radius: 6px; padding: 8px 18px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  font-family: 'Open Sans', sans-serif;
+}
+.review-btn-approve { background: var(--green); color: #fff; }
+.review-btn-approve:hover { background: #116b33; }
+.review-btn-correct { background: var(--steel); color: #fff; }
+.review-btn-correct:hover { background: #4a6eb3; }
+.review-btn-dismiss { background: var(--text-muted); color: #fff; }
+.review-btn-dismiss:hover { background: #7a8393; }
+</style>

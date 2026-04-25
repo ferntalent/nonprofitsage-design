@@ -1,0 +1,65 @@
+{% set draft_id = draft.get('draft_id', '') %}
+{% set org_name = draft.get('org_name', '') %}
+{% set org_id = draft.get('org_id', '') %}
+{% set contact_name = draft.get('contact_name', '') %}
+{% set contact_role = draft.get('contact_role', '') %}
+{% set contact_email = draft.get('contact_email', '') %}
+{% set subject = draft.get('subject', '') %}
+{% set body = draft.get('body', '') %}
+{% set trigger_reason = draft.get('trigger_reason', '') %}
+{% set safe_id = draft_id|replace(':', '-')|replace(' ', '-') %}
+
+<article id="oc-{{ safe_id }}" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:0.8rem;">
+    {% if error %}
+    <div style="padding:6px 10px;margin-bottom:0.6rem;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;color:#92400e;font-size:0.75rem;">
+        {{ error }}
+    </div>
+    {% endif %}
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:0.5rem;">
+        <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
+                {% if org_id %}<a href="/org/{{ org_id }}" style="font-size:0.8rem;color:#1a237e;font-weight:600;">{{ org_name }}</a>
+                {% else %}<span style="font-size:0.8rem;color:var(--text-secondary);">{{ org_name }}</span>{% endif %}
+                {% if trigger_reason %}
+                <span style="font-size:0.6rem;padding:1px 6px;border-radius:4px;background:#dbeafe;color:#1e40af;font-weight:600;">{{ trigger_reason[:40] }}</span>
+                {% endif %}
+            </div>
+            <div style="font-size:0.85rem;font-weight:600;color:#0d1f2d;">{{ contact_name }}</div>
+            <div style="font-size:0.75rem;color:var(--text-secondary);">{{ contact_role }} &middot; <a href="mailto:{{ contact_email }}" style="color:#5b7fc4;">{{ contact_email }}</a></div>
+        </div>
+    </div>
+
+    <!-- Editable email form -->
+    <form hx-post="/outreach/send/{{ draft_id }}" hx-target="#oc-{{ safe_id }}" hx-swap="outerHTML"
+          style="margin-top:0.5rem;">
+        <div style="margin-bottom:0.4rem;">
+            <label style="font-size:0.7rem;color:var(--text-muted);font-weight:600;">Subject</label>
+            <input type="text" name="subject" value="{{ subject }}"
+                   style="width:100%;font-size:0.82rem;border:1px solid #e2e8f0;border-radius:4px;padding:5px 8px;font-family:'Open Sans',sans-serif;">
+        </div>
+        <div style="margin-bottom:0.5rem;">
+            <label style="font-size:0.7rem;color:var(--text-muted);font-weight:600;">Body</label>
+            <textarea name="body" rows="5"
+                      style="width:100%;font-size:0.82rem;border:1px solid #e2e8f0;border-radius:4px;padding:5px 8px;font-family:'Open Sans',sans-serif;resize:vertical;">{{ body }}</textarea>
+        </div>
+
+        <div style="display:flex;gap:0.4rem;">
+            <button type="submit"
+                    style="background:#059669;color:#fff;border:none;padding:0.35rem 0.9rem;border-radius:4px;font-size:0.78rem;cursor:pointer;font-weight:600;">
+                Send
+            </button>
+            <button type="button"
+                    hx-post="/outreach/skip/{{ draft_id }}" hx-target="#oc-{{ safe_id }}" hx-swap="outerHTML"
+                    style="background:#94a3b8;color:#fff;border:none;padding:0.35rem 0.9rem;border-radius:4px;font-size:0.78rem;cursor:pointer;">
+                Skip
+            </button>
+            <button type="button"
+                    hx-post="/outreach/edit/{{ draft_id }}" hx-target="#oc-{{ safe_id }}" hx-swap="outerHTML"
+                    hx-include="closest form"
+                    style="background:#2563eb;color:#fff;border:none;padding:0.35rem 0.9rem;border-radius:4px;font-size:0.78rem;cursor:pointer;">
+                Save Edits
+            </button>
+        </div>
+    </form>
+</article>

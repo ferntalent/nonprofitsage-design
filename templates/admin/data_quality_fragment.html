@@ -1,0 +1,40 @@
+{# Reusable fragment — used both as the inner HTML of /admin/data-quality
+   and embedded in /reports behind a <details> disclosure. #}
+<div class="dq-wrap">
+  <style>
+    .dq-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .dq-wrap thead th { text-align: left; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted, #8c95a6); padding: 6px 8px; border-bottom: 1px solid var(--border, #e2e6ec); }
+    .dq-wrap tbody td { padding: 8px; border-bottom: 1px solid var(--border, #e2e6ec); vertical-align: top; }
+    .dq-wrap tbody tr:last-child td { border-bottom: none; }
+    .dq-metric-label { color: var(--text-primary, #1a2332); font-weight: 600; }
+    .dq-metric-value { color: var(--navy, #0d1f2d); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .dq-metric-pct { color: var(--steel, #5b7fc4); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .dq-metric-note { color: var(--text-muted, #8c95a6); font-size: 11px; }
+  </style>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 60%;">Metric</th>
+        <th style="text-align: right;">Value</th>
+        <th style="text-align: right;">Coverage</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in metrics %}
+      <tr>
+        <td>
+          <div class="dq-metric-label">{{ m.label }}</div>
+          {% if m.note %}<div class="dq-metric-note">{{ m.note }}</div>{% endif %}
+        </td>
+        <td style="text-align: right;"><span class="dq-metric-value">{{ m.value }}</span></td>
+        <td style="text-align: right;"><span class="dq-metric-pct">{{ m.percent }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="margin: 12px 0 0; font-size: 11.5px; color: var(--text-muted, #8c95a6);">
+    Snapshot of coverage gaps in the parquet and DuckDB stores. Low
+    percentages are the signal: that's where the next pipeline run
+    should focus.
+  </p>
+</div>

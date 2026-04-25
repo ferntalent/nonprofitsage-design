@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}News — NonprofitSage.ai{% endblock %}
+{% block content %}
+
+<style>
+/* /news — 800px centred content per spec */
+.news-wrap { max-width: 800px; margin: 0 auto; padding: 24px 0 48px; }
+.news-title { font-size: 22px; font-weight: 700; color: var(--navy); margin: 0 0 4px; }
+.news-desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 20px; }
+
+.news-filters {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: 1fr 140px 140px auto;
+  gap: 10px;
+  align-items: end;
+}
+.news-filters label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 3px; }
+.news-filters input[type="text"],
+.news-filters input[type="date"],
+.news-filters select {
+  width: 100%;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+.news-filters input:focus, .news-filters select:focus { outline: none; border-color: var(--pink); }
+.news-filters button.news-search {
+  background: var(--pink);
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  height: 34px;
+}
+.news-filters button.news-search:hover { background: #e6449e; }
+
+.news-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.news-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.news-table thead th {
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.news-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.news-table tr:last-child td { border-bottom: none; }
+.news-table tr:hover td { background: var(--bg); }
+.news-date { color: var(--text-muted); font-size: 12px; white-space: nowrap; width: 90px; }
+.news-headline a { color: var(--text-primary); text-decoration: none; font-weight: 600; }
+.news-headline a:hover { color: var(--pink); text-decoration: underline; }
+.news-source { color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+.news-org a { color: var(--navy); text-decoration: none; font-weight: 600; font-size: 12px; }
+.news-org a:hover { color: var(--pink); text-decoration: underline; }
+.news-org .muted { color: var(--text-muted); font-weight: 400; }
+
+/* "Affects" column: inline names for small lists, breadth pill + expand for large ones. */
+.news-affects { font-size: 12px; }
+.news-affects a { color: var(--navy); text-decoration: none; font-weight: 600; }
+.news-affects a:hover { color: var(--pink); text-decoration: underline; }
+.news-affects .muted { color: var(--text-muted); font-weight: 400; }
+
+.news-affects-details { display: inline-block; }
+.news-affects-details summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.news-affects-details summary::-webkit-details-marker { display: none; }
+.news-affects-details summary::before {
+  content: "▸";
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 10px;
+  transition: transform 150ms ease;
+}
+.news-affects-details[open] summary::before { transform: rotate(90deg); }
+.news-affects-label {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.news-affects-general { background: var(--bg);         color: var(--text-muted); }
+.news-affects-cause   { background: var(--amber-soft); color: var(--amber); }
+.news-affects-region  { background: var(--steel-soft); color: var(--steel); }
+.news-affects-sector  { background: var(--pink-soft);  color: var(--pink);  }
+.news-affects-count { color: var(--text-muted); }
+.news-affects-list {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-left: 2px solid var(--border);
+  border-radius: 4px;
+  line-height: 1.8;
+}
+
+.news-summary { padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.news-pagination { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); background: var(--bg); }
+.news-pagination .pager-btn {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);
+  padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; text-decoration: none;
+}
+.news-pagination .pager-btn[disabled], .news-pagination .pager-btn.disabled { color: var(--text-muted); cursor: not-allowed; }
+.news-pagination .pager-btn:hover:not([disabled]):not(.disabled) { border-color: var(--pink); color: var(--pink); }
+
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator { display: inline; }
+
+@media (max-width: 720px) {
+  .news-filters { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="news-wrap">
+  <h1 class="news-title">News</h1>
+  <p class="news-desc">Recent news across all ~175,000 organisations tracked — most recent first. Click a headline to read the source, or the organisation name to open its report.</p>
+
+  <form class="news-filters"
+        hx-get="/news/list"
+        hx-target="#news-results"
+        hx-trigger="submit, change from:select[name=source]"
+        hx-swap="innerHTML"
+        hx-indicator=".htmx-indicator">
+    <div>
+      <label for="news-q">Search headline</label>
+      <input id="news-q" type="text" name="q" value="{{ q }}" placeholder="e.g. CEO, closure, funding">
+    </div>
+    <div>
+      <label for="news-from">From</label>
+      <input id="news-from" type="date" name="date_from" value="{{ date_from }}">
+    </div>
+    <div>
+      <label for="news-to">To</label>
+      <input id="news-to" type="date" name="date_to" value="{{ date_to }}">
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button type="submit" class="news-search">Search <span class="htmx-indicator">·</span></button>
+    </div>
+    <div style="grid-column: 1 / -1;">
+      <label for="news-source">Source</label>
+      <select id="news-source" name="source">
+        <option value="all" {% if selected_source == "all" %}selected{% endif %}>All sources ({{ total }} matching)</option>
+        {% for s in sources %}
+        <option value="{{ s }}" {% if s == selected_source %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
+  <div id="news-results">
+    {% include "components/news_table.html" %}
+  </div>
+</div>
+
+{% endblock %}

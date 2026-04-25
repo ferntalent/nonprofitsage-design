@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+{% block title %}Jobs ({{ total }}) — NonprofitSage.ai{% endblock %}
+{% block main_class %}container-full{% endblock %}
+{% block content %}
+
+{# First-run tour banner — three moves the product is about. Per the
+   UX review's P2 "first-run tour: three moves — Triage, Shortlist,
+   Intel". Hides itself once the user dismisses; localStorage flag
+   means it never reappears for that browser. Plain HTML/CSS/JS — no
+   onboarding library. #}
+<div id="first-run-tour" class="first-run-tour" hidden>
+  <div class="first-run-tour-body">
+    <strong>Welcome.</strong> NonprofitSage works in three moves:
+    <ol class="first-run-tour-steps">
+      <li><strong>Triage</strong> jobs here — claim or skip in one click.</li>
+      <li><strong>Shortlist</strong> the ones worth pursuing — owners and notes survive page reloads.</li>
+      <li>Open <a href="/pipeline">Intel</a> for whole-org distress signals to time outreach.</li>
+    </ol>
+  </div>
+  <button type="button" class="first-run-tour-close"
+          onclick="document.getElementById('first-run-tour').hidden=true;localStorage.setItem('npsai_tour_seen','1')"
+          aria-label="Dismiss welcome banner">Got it</button>
+</div>
+<script>
+(function() {
+  if (localStorage.getItem('npsai_tour_seen') !== '1') {
+    var t = document.getElementById('first-run-tour');
+    if (t) t.hidden = false;
+  }
+})();
+</script>
+
+<div class="master-detail">
+
+  {# ── LEFT PANEL: filters + card list ── #}
+  <div class="master-list">
+    <div class="master-list-inner">
+
+      {# Stats row #}
+      <div class="stat-card-grid cols-3 tight">
+        <div class="stat-card">
+          <div class="stat-card-number">{{ stats.get('total_jobs', 0) }}</div>
+          <div class="stat-card-label">Jobs ({{ stats.get('days_lookback', 90) }}d)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-number highlight">{{ stats.get('new_this_week', 0) }}</div>
+          <div class="stat-card-label">New this week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-number steel">{{ stats.get('readvertised', 0) }}</div>
+          <div class="stat-card-label">Re-listed</div>
+        </div>
+      </div>
+
+      <p class="page-desc">Live job adverts from UK nonprofits and charities, ranked by intelligence score — the higher the score, the more likely they need recruitment help.</p>
+
+      {# Quick title search — textarea retained for muscle memory, but
+         the backend (/jobs/search-nl) is a tokenised keyword match
+         against job_title, not the old Haiku-extracted structured
+         filter. The filter form below covers every real parameter. #}
+      <div class="nl-search">
+        <textarea id="nl-query" name="nl_query" placeholder="Search job titles — e.g. fundraising director, interim CEO, philanthropy manager" hx-on:keydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();document.getElementById('nl-search-btn').click();}"></textarea>
+        <div class="nl-search-actions">
+          <button type="button" class="nl-search-btn" id="nl-search-btn"
+                  hx-post="/jobs/search-nl"
+                  hx-include="#nl-query"
+                  hx-target="#job-card-list"
+                  hx-swap="innerHTML"
+                  hx-indicator="#nl-progress"
+                  hx-disabled-elt="this">
+            Search titles
+          </button>
+        </div>
+        <div id="nl-progress" class="nl-progress htmx-indicator" aria-live="polite">
+          <div class="nl-progress-bar"></div>
+          <span class="nl-progress-label">Searching…</span>
+        </div>
+        <div class="nl-search-pills">
+          <button type="button" class="nl-search-pill" onclick="document.getElementById('nl-query').value=this.textContent;document.getElementById('nl-search-btn').click();">fundraising director</button>
+          <button type="button" class="nl-search-pill" onclick="document.getElementById('nl-query').value=this.textContent;document.getElementById('nl-search-btn').click();">interim CEO</button>
+          <button type="button" class="nl-search-pill" onclick="document.getElementById('nl-query').value=this.textContent;document.getElementById('nl-search-btn').click();">development director</button>
+        </div>
+        <div class="nl-search-divider">Or browse by filters</div>
+      </div>
+
+      {# Filter form #}
+      <form id="job-filters"
+            hx-get="/jobs/cards"
+            hx-target="#job-card-list"
+            hx-swap="innerHTML"
+            hx-trigger="submit"
+            hx-include="#job-filters"
+            hx-indicator="#nl-progress"
+            hx-disabled-elt="#search-btn">
+
+          <input type="hidden" name="contract_type" id="jval-contract"  value="">
+          <input type="hidden" name="source_type"   id="jval-source"    value="">
+          <input type="hidden" name="sort"          id="jval-sort"      value="intel_priority">
+
+          <div class="jfilters">
+              {# Four rows share .filter-row--grid so their four columns
+                 (label / col2 / col3 / col4) align to the same x's:
+                   Contract  Permanent   Temporary   All
+                   Source    Direct      Advert      All
+                   Sort      Intel score Newest      Salary
+                   Search    Job titles… Organisations… (empty) #}
+              <div class="filter-row filter-row--grid">
+                  <span class="filter-label">Contract</span>
+                  <button type="button" class="filter-pill" data-jgroup="contract" data-value="permanent">Permanent</button>
+                  <button type="button" class="filter-pill" data-jgroup="contract" data-value="temporary" title="Interim, fixed-term, maternity-cover, and consultancy roles">Temporary</button>
+                  <button type="button" class="filter-pill active" data-jgroup="contract" data-value="">All</button>
+              </div>
+              <div class="filter-row filter-row--grid">
+                  <span class="filter-label">Source</span>
+                  <button type="button" class="filter-pill" data-jgroup="source" data-value="direct_website">Direct</button>
+                  <button type="button" class="filter-pill" data-jgroup="source" data-value="job_board">Advert</button>
+                  <button type="button" class="filter-pill active" data-jgroup="source" data-value="">All</button>
+              </div>
+              <div class="filter-row filter-row--grid">
+                  <span class="filter-label">Sort</span>
+                  <button type="button" class="filter-pill accent" data-jgroup="sort" data-value="intel_priority" title="Sort by intelligence score — prioritises roles at organisations with stronger commercial signals">Intel score</button>
+                  <button type="button" class="filter-pill" data-jgroup="sort" data-value="posted_date">Newest</button>
+                  <button type="button" class="filter-pill" data-jgroup="sort" data-value="salary">Salary</button>
+              </div>
+              <div class="filter-row filter-row--grid">
+                  <span class="filter-label">Search</span>
+                  <input type="text" name="title_search" id="f-title-search" placeholder="Job titles…" class="filter-input">
+                  <input type="text" name="org_search" id="f-org-search" placeholder="Organisations…" class="filter-input">
+              </div>
+              <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
+              <div class="filter-row" style="flex-wrap:wrap;gap:8px;">
+                  <div class="jfield">
+                      <label for="f-cause">Cause area</label>
+                      <select name="cause_area" id="f-cause">
+                          <option value="">All causes</option>
+                          <option value="Education">Education</option>
+                          <option value="Health">Health</option>
+                          <option value="Disability">Disability</option>
+                          <option value="Children &amp; Youth">Children &amp; Youth</option>
+                          <option value="Arts &amp; Culture">Arts &amp; Culture</option>
+                          <option value="Animals">Animals</option>
+                          <option value="Environment">Environment</option>
+                          <option value="International">International</option>
+                          <option value="Housing">Housing</option>
+                          <option value="Social Services">Social Services</option>
+                          <option value="Mental Health">Mental Health</option>
+                          <option value="Sport">Sport</option>
+                          <option value="Religious">Religious</option>
+                          <option value="Community Development">Community Dev</option>
+                          <option value="Older People">Older People</option>
+                          <option value="Schools">Schools</option>
+                          <option value="Higher Education">Higher Education</option>
+                      </select>
+                  </div>
+                  <div class="jfield jfield-range">
+                      <label>Org income (£)</label>
+                      {# Hidden inputs carry the £ values the form submits.
+                         Populated / updated by initDsRange() in base.html.
+                         The scale is now linear £0..£20m (step = £200k),
+                         so defaults must be step-aligned: £200k min
+                         aligns to p=1, £10m max aligns to p=50. Old
+                         £100k default rounded to p=0 → "" on load,
+                         silently wiping the filter. #}
+                      <input type="hidden" name="income_min" id="f-income-min" value="200000">
+                      <input type="hidden" name="income_max" id="f-income-max" value="10000000">
+                      <div class="ds-range"
+                           data-min-target="f-income-min"
+                           data-max-target="f-income-max">
+                          <div class="ds-range-readout">
+                              <span><strong data-role="min-out">£200k</strong> min</span>
+                              <span>max <strong data-role="max-out">£10m</strong></span>
+                          </div>
+                          <div class="ds-range-track">
+                              <div class="ds-range-fill"></div>
+                              <input type="range" data-role="min-range" min="0" max="100" value="0" step="1" aria-label="Minimum income">
+                              <input type="range" data-role="max-range" min="0" max="100" value="100" step="1" aria-label="Maximum income">
+                          </div>
+                          <div class="ds-range-ticks">
+                              <span>£0</span><span>£5m</span><span>£10m</span><span>£15m</span><span>£20m</span>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="jfield">
+                      <label for="f-salmin">Min salary</label>
+                      <input type="number" name="salary_min" id="f-salmin" value="0" min="0" step="1000" placeholder="0" style="width:80px;">
+                  </div>
+                  <div class="jfield">
+                      <label for="f-closing">Closing within</label>
+                      <select name="closing_within" id="f-closing">
+                          <option value="">Any date</option>
+                          <option value="7">7 days</option>
+                          <option value="14">14 days</option>
+                          <option value="30">30 days</option>
+                      </select>
+                  </div>
+              </div>
+              <div class="filter-row" style="gap:12px;">
+                  <label class="jcheck"><input type="checkbox" name="readvertised_only" value="1"> Re-listed jobs only</label>
+                  <label class="jcheck"><input type="checkbox" name="show_shortlisted" value="1"> Include my shortlisted jobs</label>
+                  <label class="jcheck"><input type="checkbox" name="hide_agency" value="1"> Include recruitment agency jobs</label>
+                  <label class="jcheck" title="Include lower-priority roles (support, admin, off-topic)"><input type="checkbox" name="show_all" value="1"> Show lower-priority results</label>
+              </div>
+
+              {# Primary filter submit — big pink button below every filter
+                 row so it clearly reads as "apply all filters", not just
+                 the two Search inputs above. id="search-btn" stays so the
+                 HTMX wiring elsewhere in the page (hx-disabled-elt) still
+                 targets it. #}
+              <button type="submit" id="search-btn" class="btn-filter-submit">
+                  &#10140; Search
+              </button>
+          </div>
+      </form>
+
+      {# Scrollable card list — results count rendered inside the fragment so it updates on every swap #}
+      <div id="job-card-list">
+          {% include "components/job_card_list.html" %}
+      </div>
+
+    </div>
+  </div>
+
+  {# ── RIGHT PANEL: detail view ── #}
+  <div class="master-detail-content" id="job-detail-panel">
+    <div class="detail-empty">
+      <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      <span>Select a job from the list to see details</span>
+      <span style="font-size:0.8rem;color:var(--text-muted);">Use ↑↓ arrow keys to navigate</span>
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* Jobs page local overrides */
+.jfilters { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px; display:flex; flex-direction:column; gap:6px; }
+.jfield { display:flex; flex-direction:column; gap:3px; }
+.jfield label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+.jfield select, .jfield input[type="number"] { font-size:12px; border:1px solid var(--border); border-radius:6px; padding:4px 8px; color:var(--text-primary); background:var(--surface); height:30px; }
+.jcheck { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-secondary); font-weight:600; cursor:pointer; }
+.jcheck input { accent-color:var(--navy); width:14px; height:14px; margin:0; }
+.filter-input { font-size:12px; border:1px solid var(--border); border-radius:6px; padding:5px 10px; color:var(--text-primary); background:var(--surface); height:30px; min-width:120px; flex:1; }
+
+/* Selected card in list */
+.jc-card.selected { border-left: 3px solid var(--pink) !important; background: var(--pink-soft); }
+
+@keyframes pulse-search {
+    0%   { box-shadow:0 2px 8px rgba(255,79,190,0.3), 0 0 0 0 rgba(255,79,190,0.65); }
+    70%  { box-shadow:0 2px 8px rgba(255,79,190,0.3), 0 0 0 14px rgba(255,79,190,0); }
+    100% { box-shadow:0 2px 8px rgba(255,79,190,0.3), 0 0 0 0 rgba(255,79,190,0); }
+}
+.search-pulse { animation: pulse-search 1.1s ease-out infinite; }
+
+/* NL search progress bar — shown while Haiku request is in flight */
+.nl-progress { display:none; margin:8px 0 4px; align-items:center; gap:10px; }
+.htmx-request .nl-progress, .htmx-request.nl-progress { display:flex !important; }
+.nl-progress-bar { position:relative; flex:1; height:4px; background:var(--pink-soft); border-radius:999px; overflow:hidden; }
+.nl-progress-bar::before {
+    content:''; position:absolute; top:0; left:0; bottom:0; width:40%;
+    background:var(--pink); border-radius:999px;
+    animation: nl-progress-slide 1.1s ease-in-out infinite;
+}
+@keyframes nl-progress-slide {
+    0%   { left:-40%; }
+    100% { left:100%; }
+}
+.nl-progress-label { font-size:12px; font-weight:600; color:var(--pink); white-space:nowrap; }
+.nl-search-btn[disabled], .nl-search-btn.htmx-request { opacity:0.6; cursor:wait; }
+
+/* Results-count header at top of card list fragment */
+.job-count { margin:10px 0 6px; font-size:12px; color:var(--text-secondary); }
+.job-count strong { color:var(--text-primary); font-weight:700; }
+</style>
+
+<script>
+(function() {
+    const form = document.getElementById('job-filters');
+    if (!form) return;
+    const searchBtn = document.getElementById('search-btn');
+    const jmap = {
+        contract:  'jval-contract',
+        source:    'jval-source',
+        sort:      'jval-sort',
+    };
+
+    const pulse = () => searchBtn && searchBtn.classList.add('search-pulse');
+    const unpulse = () => searchBtn && searchBtn.classList.remove('search-pulse');
+
+    form.querySelectorAll('.filter-pill[data-jgroup]').forEach(pill => {
+        pill.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            const group = this.dataset.jgroup;
+            form.querySelectorAll('.filter-pill[data-jgroup="' + group + '"]').forEach(p => {
+                p.classList.remove('active');
+                p.classList.remove('accent');
+            });
+            this.classList.add('active');
+            const targetId = jmap[group];
+            if (targetId) {
+                var hidden = document.getElementById(targetId);
+                if (hidden) hidden.value = this.dataset.value || '';
+            }
+            pulse();
+        });
+    });
+
+    form.querySelectorAll('select, input[type=text], input[type=number], input[type=checkbox]').forEach(el => {
+        el.addEventListener('change', pulse);
+        if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number')) {
+            el.addEventListener('input', pulse);
+        }
+    });
+
+    form.addEventListener('htmx:beforeRequest', unpulse);
+
+    /* Card selection — click to load detail */
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest('.jc-card');
+        if (!card) return;
+        /* Don't intercept clicks on links, buttons, inputs */
+        if (e.target.closest('a, button, input, select, textarea, details, summary')) return;
+        document.querySelectorAll('.jc-card.selected').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+    });
+
+    /* Single-open discipline for Claim / Shortlist <details class="jc-dropdown">.
+       Native <details> has no "close siblings" behaviour, so opening one
+       while another is open leaves both visible and overlapping (the
+       screenshot Tim shared on the #355 follow-up). The `toggle` event
+       doesn't bubble, so listen in capture phase. */
+    document.addEventListener('toggle', function(e) {
+        var t = e.target;
+        if (!t || !t.classList || !t.classList.contains('jc-dropdown') || !t.open) return;
+        document.querySelectorAll('.jc-dropdown[open]').forEach(function(d) {
+            if (d !== t) d.open = false;
+        });
+    }, true);
+
+    /* Close open jc-dropdowns when the user clicks outside them —
+       mirrors the Intel .claim-dropdown outside-click handler at
+       pipeline.html. */
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.jc-dropdown')) return;
+        document.querySelectorAll('.jc-dropdown[open]').forEach(function(d) { d.open = false; });
+    });
+
+    /* Keyboard navigation */
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        var cards = Array.from(document.querySelectorAll('#job-card-list .jc-card'));
+        if (!cards.length) return;
+        var selected = document.querySelector('.jc-card.selected');
+        var idx = selected ? cards.indexOf(selected) : -1;
+
+        if (e.key === 'ArrowDown' || e.key === 'j') {
+            e.preventDefault();
+            idx = Math.min(idx + 1, cards.length - 1);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp' || e.key === 'k') {
+            e.preventDefault();
+            idx = Math.max(idx - 1, 0);
+            cards[idx].click();
+            cards[idx].scrollIntoView({ block: 'nearest' });
+        }
+    });
+
+    /* Auto-select first card after HTMX initialises */
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            var first = document.querySelector('#job-card-list .jc-card');
+            if (first) { first.click(); }
+        }, 150);
+    });
+
+    /* After the user claims / shortlists / skips / dismisses a job, the
+       card's outerHTML swap removes it from the list. The server also
+       fires an `HX-Trigger: jobTriaged` header, which htmx dispatches on
+       document.body as a CustomEvent. Listen for that, advance the
+       detail panel to the next card, and if the remaining list is
+       getting short, auto-click the "Load more" button to pull in a new
+       card at the bottom. This is the behavioural fix for the bug where
+       triaged jobs didn't advance the queue. */
+    document.body.addEventListener('jobTriaged', function(ev) {
+        /* Only advance the queue if the triaged job was the one the
+           user had open in the detail panel. Quick-dismiss (✕) on a
+           background card in the list must not wipe the detail of a
+           different job the user is actively reading — Codex P2 flagged
+           this on #355. `ev.detail.job_id` comes from the HX-Trigger
+           payload set by /jobs/claim, /jobs/shortlist, /jobs/skip and
+           /jobs/dismiss. Fall back to "advance" when no card is
+           selected (first-time triage) so the empty detail panel still
+           auto-populates. */
+        var triagedId = ev && ev.detail && ev.detail.job_id;
+        var selected = document.querySelector('#job-card-list .jc-card.selected');
+        var selectedId = selected ? selected.id.replace(/^job-/, '') : '';
+        if (selected && selectedId !== triagedId) {
+            /* Background dismiss — still top up the list if it got short,
+               but leave the detail panel alone. */
+            var remainingBg = document.querySelectorAll('#job-card-list .jc-card');
+            var moreBg = document.querySelector('#job-card-list .load-more');
+            if (remainingBg.length < 5 && moreBg) moreBg.click();
+            return;
+        }
+
+        var detail = document.getElementById('job-detail-panel');
+        if (detail) {
+            detail.innerHTML = '<div class="detail-empty"><svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg><span>Select a job from the list to see details</span><span style="font-size:0.8rem;color:var(--text-muted);">Use ↑↓ arrow keys to navigate</span></div>';
+        }
+        /* Pick the next card — the triaged card has already been removed
+           from the DOM by this point, so just grab whatever is first.
+           Trigger Load More whenever the queue drops below 5 (including
+           the zero-remaining case where the user just triaged the last
+           visible card) so triage doesn't stall with an empty list while
+           more results sit behind the button. The Load More click fires
+           an HTMX beforeend swap, so the next auto-select happens on its
+           htmx:afterSwap (wired below) once the new cards land. */
+        setTimeout(function() {
+            var remaining = document.querySelectorAll('#job-card-list .jc-card');
+            var more = document.querySelector('#job-card-list .load-more');
+            if (remaining.length < 5 && more) {
+                more.click();
+            }
+            var next = document.querySelector('#job-card-list .jc-card');
+            if (next) next.click();
+        }, 50);
+    });
+
+    /* After a Load More swap lands, auto-select the first card if the
+       detail panel is currently empty — covers the "triaged the last
+       card, queue was zero, Load More just refilled" path. */
+    document.body.addEventListener('htmx:afterSwap', function(ev) {
+        if (!ev.target || ev.target.id !== 'job-card-list') return;
+        var detail = document.getElementById('job-detail-panel');
+        var isEmpty = detail && detail.querySelector('.detail-empty');
+        if (!isEmpty) return;
+        var next = document.querySelector('#job-card-list .jc-card');
+        if (next) next.click();
+    });
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,15 @@
+{# Stat-card grid for the review sidebar. Rendered by /admin/review and
+   re-rendered standalone by /admin/review/fragment/stats for live refresh. #}
+<div class="stat-card">
+  <div class="stat-card-number highlight">{{ total_pending }}</div>
+  <div class="stat-card-label">Pending</div>
+</div>
+{% for cat, label in category_labels.items() %}
+{% set c = categories.get(cat, 0) %}
+{% if c > 0 %}
+<div class="stat-card">
+  <div class="stat-card-number">{{ c }}</div>
+  <div class="stat-card-label">{{ label }}</div>
+</div>
+{% endif %}
+{% endfor %}

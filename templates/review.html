@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Review Queue — Intelligence Hub{% endblock %}
+{% block content %}
+
+<div class="stats-bar" role="group">
+    <span class="stat"><strong>{{ items|length }}</strong> jobs pending review</span>
+</div>
+
+{% if filter_options %}
+<form id="review-filters" style="margin-bottom:1rem;">
+    <div style="display:flex;gap:0.5rem;align-items:end;">
+        <div>
+            <label for="f-reason" style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:2px;display:block;">Reason</label>
+            <select name="reason" id="f-reason" onchange="window.location.search='?reason='+this.value" style="font-size:0.85rem;">
+                <option value="">All reasons</option>
+                <option value="no_salary" {% if current_reason == 'no_salary' %}selected{% endif %}>No salary</option>
+                <option value="ambiguous_title" {% if current_reason == 'ambiguous_title' %}selected{% endif %}>Ambiguous title</option>
+            </select>
+        </div>
+    </div>
+</form>
+{% endif %}
+
+<div id="review-card-list">
+{% if items %}
+    {% for item in items %}
+        {% include "components/review_card.html" %}
+    {% endfor %}
+{% else %}
+    <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+        <p style="font-size:1.1rem;">No jobs pending review</p>
+        <p style="font-size:0.85rem;">New items will appear here after the next scrape run.</p>
+    </div>
+{% endif %}
+</div>
+
+{% endblock %}

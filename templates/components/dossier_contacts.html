@@ -1,0 +1,97 @@
+{% set contact_list = contacts if contacts else [] %}
+
+<article class="dossier-panel" id="contacts-panel">
+    <header style="display:flex;align-items:baseline;gap:10px;">
+        <h3 class="ds-label" style="margin:0;">Contacts{% if contact_list %} <span style="color:var(--text-muted);font-weight:400;font-size:10px;">({{ contact_list | length }})</span>{% endif %}</h3>
+    </header>
+    {% if contact_list %}
+    <div class="contact-chips">
+        {% for c in contact_list %}
+        <div class="contact-chip">
+            <div class="contact-chip-avatar">{{ (c.get('name', '?')[0:1]) | upper }}</div>
+            <div>
+                <div class="contact-chip-name">{{ c.get('name', '') }}</div>
+                <div class="contact-chip-role">
+                    {{ c.get('role_title', '') or '' }}
+                </div>
+                {% set _badges = c.get('source_badges') or [] %}
+                {% if _badges %}
+                <div class="source-badges" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">
+                    {% for b in _badges %}
+                        <span class="source-badge source-badge--{{ b.tone }}">{{ b.label }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {# Phase 5: last-contacted badge, colour-coded by recency. #}
+                {% set _lc = c.get('last_contacted_at') %}
+                {% if _lc %}
+                  {% set _lc_str = _lc | format_last_contacted %}
+                  <div class="last-contacted-badge"
+                       style="font-size:10px;font-weight:600;margin-top:2px;
+                              {% if 'day' in _lc_str or 'Today' in _lc_str or 'week' in _lc_str %}color:var(--pink);{% elif 'month' in _lc_str %}color:var(--steel);{% else %}color:var(--text-muted);{% endif %}">
+                    Last contacted: {{ _lc_str }}
+                  </div>
+                {% else %}
+                  <div class="last-contacted-badge" style="font-size:10px;font-weight:600;margin-top:2px;color:var(--text-muted);">
+                    Never contacted
+                  </div>
+                {% endif %}
+                <div class="contact-chip-links">
+                    {% if c.get('email') %}
+                        <a href="mailto:{{ c['email'] }}" class="link-pill">Email</a>
+                    {% endif %}
+                </div>
+                {# Per-contact action row — Enrich (with 30-day cooldown)
+                   + View on LinkedIn. Replaces the old plain link-pill for
+                   LinkedIn so the primary CTA is the one users click. #}
+                {% with
+                    contact_id=c.get('contact_id'),
+                    linkedin_url=c.get('linkedin_url'),
+                    enrichment_locked=c.get('enrichment_locked', False),
+                    days_until_unlock=c.get('days_until_unlock', 0),
+                    last_enriched_display=c.get('last_enriched_display', ''),
+                    resolved_email=None,
+                    lookup_note=None
+                %}
+                    {% include "components/contact_actions.html" %}
+                {% endwith %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="panel-empty" style="padding:14px 16px;background:var(--bg);border:1px dashed var(--border);border-radius:8px;font-size:13px;color:var(--text-secondary);display:flex;flex-direction:column;gap:8px;">
+        <div>
+            <strong>No contacts yet for this organisation.</strong>
+            We haven't landed any Loxo, LinkedIn, or Derrick rows against this org.
+            Click below to queue a single-org Derrick enrichment — usually returns
+            a CEO or Head of Fundraising within 1&ndash;2 minutes.
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button type="button"
+                    style="font-size:12px;padding:6px 14px;background:var(--pink);color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;"
+                    hx-post="/api/internal/enrich-contacts-one"
+                    hx-vals='{"org_id": "{{ org_id }}"}'
+                    hx-target="#contacts-panel"
+                    hx-swap="outerHTML"
+                    hx-on::after-request="this.textContent = 'Enriching — refreshing every 20s'; this.disabled = true;"
+                    title="Queue a Derrick enrichment run for this org (takes 1-2 minutes)">
+                Enrich via Derrick
+            </button>
+            <span hx-get="/api/org/{{ org_id }}/panel/contacts"
+                  hx-trigger="every 20s"
+                  hx-swap="outerHTML"
+                  hx-target="#contacts-panel"
+                  style="display:none;"></span>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Nested alumni subsection — lazy-loaded via HTMX so it doesn't add to TTFB.
+       Renders nothing when there are no alumni for this org. #}
+    <div id="contacts-alumni"
+         hx-get="/api/org/{{ org_id }}/panel/people-history"
+         hx-trigger="revealed"
+         hx-swap="innerHTML"
+         style="margin-top:14px;"></div>
+</article>

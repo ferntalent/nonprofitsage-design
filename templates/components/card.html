@@ -1,0 +1,179 @@
+{% set org_id = item.get('org_id', item.get('opportunity_id', '')) %}
+{% set org_name_raw = item.get('org_name', '') or org_id %}
+{% set org_name = org_name_raw | smart_org %}
+{% set score = item.get('total_score') or item.get('score', 0) or 0 %}
+{% set frame = item.get('primary_frame', '') or '' %}
+{% set status = item.get('status', 'new') %}
+{% set has_warm = item.get('has_warm_path', false) %}
+{% set warm_contact = item.get('warm_path_contact', '') or '' %}
+{% set freshness = item.get('freshness') or 0 %}
+
+<article class="card card-clickable
+    {% if frame == 'bleeding_neck' %}card-bn{% elif frame == 'fresh_wallet' %}card-fw{% endif %}
+    {% if status == 'pursuing' %}card-pursuing{% endif %}
+    {% if freshness < 0.33 %}card-stale{% endif %}"
+    id="card-{{ org_id }}"
+    hx-get="/pipeline/detail/{{ org_id }}"
+    hx-target="#pipeline-detail-panel"
+    hx-swap="innerHTML">
+
+    <header>
+        <div class="card-header">
+            <span class="card-rank-num">{{ loop.index if loop is defined else '' }}</span>
+            <!-- Urgency indicator -->
+            {% if frame == 'bleeding_neck' and freshness >= 0.8 %}
+                <span class="urgency urgency-red" title="Act today">&#9679;</span>
+            {% elif freshness >= 0.5 %}
+                <span class="urgency urgency-amber" title="Act this week">&#9679;</span>
+            {% else %}
+                <span class="urgency urgency-green" title="Monitor">&#9679;</span>
+            {% endif %}
+
+            <span class="ds-row-2">
+                {% set org_url = item.get('website_url','') or item.get('website','') or '' %}
+                {% if org_url %}
+                <img src="https://www.google.com/s2/favicons?domain={{ org_url | domain_only }}&sz=64"
+                     onerror="this.style.display='none'"
+                     class="jc-favicon">
+                {% endif %}
+                <a href="/org/{{ org_id }}" class="jc-org-name" onclick="event.stopPropagation()">{{ org_name | smart_org }}</a>
+                {% set chg = item.get('score_change') %}
+                {% if chg and chg > 1 %}<span class="card-score-up" title="Score up {{ '%.0f'|format(chg) }}">&#9650;</span>
+                {% elif chg and chg < -1 %}<span class="card-score-down" title="Score down {{ '%.0f'|format(chg|abs) }}">&#9660;</span>
+                {% endif %}
+            </span>
+            {% if score %}
+            <span class="score-pill score-pill-push-right {% if score >= 60 %}score-pill-hot{% elif score >= 20 %}score-pill-warm{% else %}score-pill-monitoring{% endif %}"
+                  title="{{ item | score_tooltip }}">{{ "%.0f"|format(score) }}</span>
+            {% endif %}
+            {% set _news_count = news_count_for(org_id) if news_count_for is defined else 0 %}
+            {% if _news_count %}
+            <a href="/org/{{ org_id }}#news"
+               onclick="event.stopPropagation()"
+               class="news-badge {% if not score %}news-badge-push{% else %}news-badge-after-score{% endif %}"
+               title="{{ _news_count }} recent news article{{ 's' if _news_count != 1 else '' }} — click to view">&#128240; {{ _news_count }}</a>
+            {% endif %}
+
+            <!-- Frame badge -->
+            {% if frame == 'bleeding_neck' %}
+                <span class="badge badge-bn" title="Distress signal — organisation showing signs of financial or operational difficulty">Distress</span>
+            {% elif frame == 'fresh_wallet' %}
+                <span class="badge badge-fw" title="Growth signal — organisation showing signs of expansion or new spending">Growth</span>
+            {% endif %}
+        </div>
+
+        <!-- Warm path (prominent, right after org name) -->
+        {% if has_warm %}
+        <div class="warm-path-banner" title="You have a direct connection at this organisation">
+            &#9733; You know <strong>{{ warm_contact }}</strong>
+        </div>
+        {% endif %}
+
+        <!-- Org context: income band · cause · location · status badge -->
+        {% set cause = item.get('cause_area', '') or '' %}
+        {% set location = item.get('location', '') or '' %}
+        {% set income_band = item.get('income_band', '') or '' %}
+        {% set status_label = {'new': 'new', 'triaged': 'working', 'pursuing': 'claimed', 'monitoring': 'monitoring'}.get(status, status) %}
+        <div class="card-context">
+            {% if income_band %}<span class="ctx-income">{{ income_band }}</span>{% endif %}
+            {% if cause %}<span>{{ cause }}</span>{% endif %}
+            {% if location %}<span>{{ location }}</span>{% endif %}
+            <span class="status-tag status-{{ status }}">{{ status_label }}</span>
+        </div>
+
+        <!-- Funding model badge -->
+        {% set fm = item.get('primary_funding_model', '') or '' %}
+        {% if fm and fm != 'Unknown' %}
+        <div class="fm-wrap">
+            <span class="fm-badge fm-{{ fm|lower|replace('/','-')|replace(' ','-') }}"
+                  title="Streams detected: {{ (item.get('funding_summary','') or '')|replace(',', ', ') }}">{{ fm }}</span>
+        </div>
+        {% endif %}
+        {% set change = item.get('score_change') %}
+        {% if change and (change > 1 or change < -1) %}
+        <div class="card-meta">
+            {% if change > 0 %}
+            <span class="score-change score-up" title="Score increased by {{ '%.0f'|format(change) }} since last run">&#9650;&nbsp;+{{ '%.0f'|format(change) }}</span>
+            {% else %}
+            <span class="score-change score-down" title="Score decreased by {{ '%.0f'|format(change|abs) }} since last run">&#9660;&nbsp;{{ '%.0f'|format(change) }}</span>
+            {% endif %}
+        </div>
+        {% endif %}
+        <div class="card-scorebar">
+            <div style="width: {{ [score, 100]|min }}%"></div>
+        </div>
+    </header>
+
+    <!-- Pitch (truncated to 2 lines via CSS line-clamp). 'Why now' lives
+         in the detail panel only — keeping both on every card made each
+         card ~300px tall and caused the overlap the user reported. -->
+    {% if item.get('pitch_angle') %}
+    <p class="pitch"><strong>Pitch:</strong> {{ item['pitch_angle'] | extract_bullet }}</p>
+    {% endif %}
+
+    <!-- Top signals — single compact line (details in the right-hand panel). -->
+    {% set signals_raw = item.get('top_signal_ids', '[]') or '[]' %}
+    {% set signals = signals_raw | fromjson if signals_raw is string else signals_raw %}
+    {% set signal_labels = [] %}
+    {% if signals %}
+        {% for sig in signals %}
+            {% if sig %}
+                {% set _ = signal_labels.append(trigger_display_names.get(sig, sig | replace('_', ' ') | title)) %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    {% if signal_labels %}
+    <p class="signals">
+        <strong>Signals:</strong>
+        {{ signal_labels | join(' · ') }}
+    </p>
+    {% endif %}
+
+    {# Three actions only: Report / Loxo / LinkedIn. Same size, outline style,
+       Fern Talent teal accent. #}
+    {% set _li_url = item.get('linkedin_url') or '' %}
+    {% if not _li_url %}
+      {% set _li_url = 'https://www.linkedin.com/search/results/companies/?keywords=' ~ (org_name | urlencode) %}
+    {% endif %}
+    <div class="card-action-row">
+        <a href="/org/{{ org_id }}" class="btn-card-action" onclick="event.stopPropagation()">Report</a>
+        <a href="https://fern-talent.app.loxo.co/agencies/40830/companies?query={{ org_name | urlencode }}" target="_blank" rel="noopener" class="btn-card-action" title="Open in Loxo (Fern's ATS)" onclick="event.stopPropagation()">ATS</a>
+        <a href="{{ _li_url }}" target="_blank" rel="noopener" class="btn-card-action" onclick="event.stopPropagation()">LinkedIn</a>
+        {% if item.get('in_loxo') %}
+            <span class="badge-in-loxo" title="Already in Loxo (Fern's ATS)">In ATS</span>
+        {% endif %}
+    </div>
+
+    <!-- Claim / Skip — inline buttons, no dropdown.
+         The old <details class="dropdown"> wasn't styled with position:absolute,
+         so when opened it pushed the rest of the card content down into the
+         next card's visual space. Inline buttons don't move. -->
+    <footer class="card-actions" onclick="event.stopPropagation()">
+        {% if item.get('claimed_by') %}
+            <span class="badge-claimed">Claimed by {{ item.get('claimed_by') }}</span>
+        {% else %}
+            <div class="claim-dropdown">
+                <button type="button" class="claim-btn claim-toggle"
+                        title="Mark this organisation as being worked by Tim or Rory so you don't double up on outreach."
+                        onclick="this.parentElement.classList.toggle('open')">&#10003; Claim &#9662;</button>
+                <div class="claim-menu">
+                    <button type="button" class="claim-menu-item"
+                            hx-post="/api/triage/{{ org_id }}/claim"
+                            hx-vals='{"claimed_by": "Tim"}'
+                            hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Assign to Tim</button>
+                    <button type="button" class="claim-menu-item"
+                            hx-post="/api/triage/{{ org_id }}/claim"
+                            hx-vals='{"claimed_by": "Rory"}'
+                            hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Assign to Rory</button>
+                </div>
+            </div>
+            <button type="button"
+                    class="skip-btn"
+                    hx-post="/api/triage/{{ org_id }}/skip"
+                    hx-vals='{"reason": "skipped"}'
+                    hx-target="#card-{{ org_id }}" hx-swap="outerHTML">
+                &#10005; Skip
+            </button>
+        {% endif %}
+    </footer>
+</article>

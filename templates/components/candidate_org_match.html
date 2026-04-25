@@ -1,0 +1,70 @@
+{#
+  One matched-org card. Rendered inside the Matched Organisations tab,
+  for both the "They'd want you" and "You'd want them" lists.
+
+  Context:
+    rank    : 1-based position in its list
+    band    : 'hot' | 'warm' | 'monitor'  — derived from the org's transition
+              and growth scores (internal metric)
+    m       : match dict from services.candidate_matcher (keys: org_id,
+              org_name, charity_number_ew, classifications, income,
+              bleeding_neck_score, fresh_wallet_score, analyst_summary,
+              website, match_score, match_rationale, per_dim_scores)
+    situation_facts : list of plain-English strings describing the org's
+              current situation (from services.candidate_outputs
+              ._translate_signals_to_facts). Replaces the old raw 0-5
+              Risk / Opportunity numbers.
+#}
+<div class="cp-org-card cp-org-band-{{ band }}">
+  <div class="cp-org-head">
+    <span class="cp-org-rank">#{{ rank }}</span>
+    {% if m.charity_number_ew %}
+      <a href="/api/org/{{ m.charity_number_ew }}/dossier" target="_blank"
+         class="cp-org-name">{{ m.org_name | smart_org }}</a>
+    {% else %}
+      <span class="cp-org-name">{{ m.org_name | smart_org }}</span>
+    {% endif %}
+    <span class="cp-org-score"
+          title="Match score (0-100)">{{ (m.match_score or 0) | round | int }}</span>
+    {% if band == 'hot' %}
+      <span class="mm-badge mm-badge-hot">Hot</span>
+    {% elif band == 'warm' %}
+      <span class="mm-badge mm-badge-warm">Warm</span>
+    {% endif %}
+  </div>
+
+  <div class="cp-org-meta">
+    {% if m.income %}&pound;{{ '{:,.0f}'.format(m.income) }} income{% endif %}
+    {% if m.classifications %}
+      {% if m.income %} &middot; {% endif %}
+      {{ m.classifications[:80] | smart_title }}
+    {% endif %}
+  </div>
+
+  {% if situation_facts %}
+    <ul class="cp-org-situation">
+      {% for f in situation_facts %}<li>{{ f }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if m.match_rationale %}
+    <div class="cp-org-rationale">{{ m.match_rationale }}</div>
+  {% endif %}
+
+  {% if m.analyst_summary %}
+    <div class="cp-org-summary">{{ m.analyst_summary }}</div>
+  {% endif %}
+
+  <div class="cp-org-actions">
+    {% if m.charity_number_ew %}
+      <a href="/api/org/{{ m.charity_number_ew }}/dossier" target="_blank">Report</a>
+    {% endif %}
+    {% if m.website %}
+      <a href="{{ m.website }}" target="_blank" rel="noopener noreferrer">Website</a>
+    {% endif %}
+    {% if m.charity_number_ew %}
+      <a href="https://register-of-charities.charitycommission.gov.uk/charity-search/-/charity-details/{{ m.charity_number_ew }}"
+         target="_blank" rel="noopener noreferrer">Register</a>
+    {% endif %}
+  </div>
+</div>

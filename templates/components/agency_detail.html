@@ -1,0 +1,54 @@
+{% if detail.top_orgs %}
+<td colspan="5" style="padding:1rem 1.5rem;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+
+    <!-- Top organisations -->
+    <div>
+      <h4 style="font-size:0.85rem;font-weight:600;color:var(--navy);margin:0 0 0.6rem 0;">Top organisations placed at</h4>
+      <table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
+        {% for org in detail.top_orgs[:10] %}
+        <tr style="border-bottom:1px solid #f0f0f0;">
+          <td style="padding:0.3rem 0;color:var(--text-primary);">{{ org.org_name | smart_org }}</td>
+          <td style="padding:0.3rem 0;text-align:right;color:var(--text-secondary);">{{ org.placements }} placement{{ 's' if org.placements != 1 }}</td>
+          <td style="padding:0.3rem 0 0.3rem 0.5rem;text-align:right;color:var(--text-muted);">
+            {% if org.avg_salary %}£{{ "{:,.0f}".format(org.avg_salary) }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <!-- Monthly sparkline -->
+    <div>
+      <h4 style="font-size:0.85rem;font-weight:600;color:var(--navy);margin:0 0 0.6rem 0;">Placement trend</h4>
+      <canvas id="spark-{{ detail.agency_name | replace(' ','_') }}" height="120"></canvas>
+    </div>
+
+  </div>
+</td>
+
+<script>
+(function() {
+  const monthly = {{ detail.monthly | tojson }};
+  const labels = monthly.map(r => r.month);
+  const data   = monthly.map(r => r.placements);
+  const id = 'spark-{{ detail.agency_name | replace(" ","_") }}';
+  new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: '#FF4FBE', borderRadius: 2 }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 9 }, maxRotation: 45 } },
+        y: { ticks: { font: { size: 10 } }, beginAtZero: true }
+      }
+    }
+  });
+})();
+</script>
+{% else %}
+<td colspan="5" style="padding:0.75rem 1.5rem;color:var(--text-muted);font-size:0.85rem;">No placement history found for this agency.</td>
+{% endif %}

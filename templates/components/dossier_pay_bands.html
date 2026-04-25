@@ -1,0 +1,38 @@
+<article class="dossier-panel">
+    <header><h3 class="ds-label" style="margin:0;">Senior Pay Bands</h3></header>
+
+    {% if not overview %}
+        <p class="panel-empty">
+            {% if charity_number %}
+                Pay-band data not yet enriched — the Charity Commission
+                <code>/charityoverview</code> endpoint runs nightly. This panel will
+                populate once the charity reaches the priority queue.
+            {% else %}
+                No registered charity number for this org, so the Charity Commission
+                API can&rsquo;t be queried.
+            {% endif %}
+        </p>
+    {% elif not chart_b64 %}
+        <p class="panel-empty">This charity reports no employees in any pay band
+           from &pound;60k upwards (i.e. no staff above the senior-pay disclosure
+           threshold on the most recent filing).</p>
+    {% else %}
+        <div class="insight-box">
+            <strong>{{ over_100k }}</strong> employee{{ 's' if over_100k != 1 else '' }}
+            earn{{ 's' if over_100k == 1 else '' }} &pound;100k+ at this organisation
+            {% if overview.employees_count %}
+                (out of {{ overview.employees_count }} total employees).
+            {% else %}.
+            {% endif %}
+        </div>
+
+        <img src="data:image/png;base64,{{ chart_b64 }}"
+             alt="Distribution of employees by senior pay band"
+             style="max-width:100%; height:auto; margin-top:8px;">
+
+        <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+            Source: Charity Commission Annual Return
+            (<code>/charityoverview</code>), most recent filing.
+        </p>
+    {% endif %}
+</article>

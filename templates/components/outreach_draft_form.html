@@ -1,0 +1,107 @@
+{# Phase 4: Haiku-drafter drawer. Inserted in place of the contact row
+   when the consultant clicks "✉ Draft". Submits to /api/outreach/draft. #}
+<div class="outreach-drawer" id="outreach-drawer-{{ contact.contact_id }}"
+     style="margin-top:8px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);">
+
+  <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:700;color:var(--text-primary);font-size:13px;">{{ contact.name }}</div>
+      <div style="color:var(--text-muted);font-size:11px;">{{ contact.role_title or '' }}</div>
+      {% if contact.email %}
+      <div style="color:var(--steel);font-size:11px;font-family:'Open Sans',monospace;margin-top:2px;">
+        {{ contact.email }}
+      </div>
+      {% endif %}
+      <div style="color:var(--text-muted);font-size:10.5px;margin-top:2px;">
+        Last contacted: {{ contact.last_contacted_at | format_last_contacted }}
+      </div>
+    </div>
+    <button type="button"
+            class="btn-ghost"
+            style="font-size:11px;padding:2px 8px;border:1px solid var(--border);background:var(--bg);border-radius:6px;color:var(--text-muted);cursor:pointer;"
+            onclick="document.getElementById('outreach-drawer-{{ contact.contact_id }}').remove();">
+      &times; Close
+    </button>
+  </div>
+
+  <form hx-post="/api/outreach/draft"
+        hx-target="#outreach-drawer-{{ contact.contact_id }}"
+        hx-swap="outerHTML"
+        hx-indicator="#drawer-ind-{{ contact.contact_id }}">
+    <input type="hidden" name="contact_id" value="{{ contact.contact_id }}">
+    <input type="hidden" name="depth" id="depth-{{ contact.contact_id }}" value="standard">
+    <input type="hidden" name="tone"  id="tone-{{ contact.contact_id }}"  value="warm">
+    <input type="hidden" name="variant" id="variant-{{ contact.contact_id }}" value="{% if contact.last_contacted_at %}follow_up{% else %}initial{% endif %}">
+
+    <label style="display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">
+      What do you want to say? (tone, length, specific points)
+    </label>
+    <textarea name="steering" rows="3"
+              placeholder="Short, informal. Mention their recent CEO departure and the £2m reserves concern. Offer a 20-min call."
+              style="width:100%;font-size:12px;font-family:'Open Sans',sans-serif;border:1px solid var(--border);border-radius:6px;padding:8px;resize:vertical;color:var(--text-primary);"></textarea>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+      <div>
+        <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-right:4px;">Depth</span>
+        <button type="button" class="filter-pill depth-pill" data-value="short"    data-contact="{{ contact.contact_id }}" style="font-size:11px;padding:2px 8px;">Short</button>
+        <button type="button" class="filter-pill depth-pill active" data-value="standard" data-contact="{{ contact.contact_id }}" style="font-size:11px;padding:2px 8px;">Standard</button>
+        <button type="button" class="filter-pill depth-pill" data-value="detailed" data-contact="{{ contact.contact_id }}" style="font-size:11px;padding:2px 8px;">Detailed</button>
+      </div>
+      <div>
+        <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-right:4px;">Tone</span>
+        <button type="button" class="filter-pill tone-pill active" data-value="warm"         data-contact="{{ contact.contact_id }}" style="font-size:11px;padding:2px 8px;">Warm</button>
+        <button type="button" class="filter-pill tone-pill" data-value="professional" data-contact="{{ contact.contact_id }}" style="font-size:11px;padding:2px 8px;">Professional</button>
+        <button type="button" class="filter-pill tone-pill" data-value="direct"       data-contact="{{ contact.contact_id }}" style="font-size:11px;padding:2px 8px;">Direct</button>
+      </div>
+      <div>
+        <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-right:4px;">Variant</span>
+        <button type="button" class="filter-pill variant-pill {% if not contact.last_contacted_at %}active{% endif %}" data-value="initial"   data-contact="{{ contact.contact_id }}" style="font-size:11px;padding:2px 8px;">Initial</button>
+        <button type="button" class="filter-pill variant-pill {% if contact.last_contacted_at %}active{% endif %}"    data-value="follow_up" data-contact="{{ contact.contact_id }}" style="font-size:11px;padding:2px 8px;">Follow-up</button>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <button type="submit" class="btn-primary" style="font-size:12px;padding:5px 14px;">Draft</button>
+      {% if org_contacts_count and org_contacts_count >= 2 %}
+      <button type="button"
+              class="btn-secondary"
+              style="font-size:12px;padding:5px 14px;background:var(--pink-soft);border:1.5px solid var(--pink);color:var(--pink);border-radius:6px;font-weight:700;cursor:pointer;"
+              hx-post="/api/outreach/draft-all/{{ org_id }}"
+              hx-include="closest form"
+              hx-target="#outreach-drawer-{{ contact.contact_id }}"
+              hx-swap="outerHTML"
+              hx-indicator="#drawer-ind-{{ contact.contact_id }}">
+        Draft for all {{ org_contacts_count }} contacts
+      </button>
+      {% endif %}
+      <span id="drawer-ind-{{ contact.contact_id }}" class="htmx-indicator" style="font-size:11px;color:var(--text-muted);">
+        Drafting via Claude Haiku…
+      </span>
+    </div>
+  </form>
+</div>
+
+<script>
+(function() {
+    /* Pills in the drawer toggle the hidden inputs for depth + tone.
+       Scoped by data-contact so multiple drawers can coexist. */
+    var cid = {{ contact.contact_id | tojson }};
+    var groups = {
+        depth:   { selector: '.depth-pill[data-contact="'   + cid + '"]', target: 'depth-'   + cid },
+        tone:    { selector: '.tone-pill[data-contact="'    + cid + '"]', target: 'tone-'    + cid },
+        variant: { selector: '.variant-pill[data-contact="' + cid + '"]', target: 'variant-' + cid },
+    };
+    Object.keys(groups).forEach(function(g) {
+        var group = groups[g];
+        document.querySelectorAll(group.selector).forEach(function(pill) {
+            pill.addEventListener('click', function(ev) {
+                ev.preventDefault();
+                document.querySelectorAll(group.selector).forEach(function(p) { p.classList.remove('active'); });
+                this.classList.add('active');
+                var target = document.getElementById(group.target);
+                if (target) target.value = this.dataset.value;
+            });
+        });
+    });
+})();
+</script>

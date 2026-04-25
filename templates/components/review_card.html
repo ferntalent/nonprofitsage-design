@@ -1,0 +1,46 @@
+{% set org_name = item.get('org_name', 'Unknown') %}
+{% set job_title = item.get('job_title', 'Untitled role') %}
+{% set job_url = item.get('job_url', '') %}
+{% set salary_raw = item.get('salary_raw', '') %}
+{% set title_match = item.get('title_match', '') %}
+{% set reason = item.get('reason', '') %}
+{% set org_id = item.get('org_id', '') %}
+{% set scraped_at = item.get('scraped_at', '') %}
+
+{% if reason == 'no_salary' %}{% set reason_label = "No salary found" %}{% set reason_cls = "ns-badge-warm" %}
+{% elif reason == 'ambiguous_title' %}{% set reason_label = "Ambiguous title" %}{% set reason_cls = "ns-badge-signal" %}
+{% else %}{% set reason_label = reason %}{% set reason_cls = "" %}{% endif %}
+
+<article class="ns-card ns-card-neutral" id="review-{{ loop.index }}" style="margin-bottom:0.75rem;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
+        <div style="flex:1;min-width:0;">
+            <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.2rem;">
+                {% if org_id %}<a href="/org/{{ org_id }}" style="color:#1a237e;">{{ org_name | smart_org }}</a>{% else %}{{ org_name | smart_org }}{% endif %}
+            </div>
+            <div style="font-weight:600;font-size:0.95rem;margin-bottom:0.3rem;">
+                {% if job_url %}<a href="{{ job_url }}" target="_blank" rel="noopener" style="color:#0d1f2d;">{{ job_title|lower|capitalize }}</a>
+                {% else %}{{ job_title|lower|capitalize }}{% endif %}
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;font-size:0.8rem;">
+                {% if salary_raw %}<span style="color:#333;">{{ salary_raw }}</span>{% endif %}
+                {% if title_match %}<span class="ns-badge ns-badge-func">{{ title_match }}</span>{% endif %}
+                {% if reason_label %}<span class="ns-badge {{ reason_cls }}">{{ reason_label }}</span>{% endif %}
+                {% if scraped_at %}<span style="color:var(--text-muted);">{{ scraped_at[:10] }}</span>{% endif %}
+            </div>
+        </div>
+        <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+            <form hx-post="/jobs/review/approve" hx-target="#review-{{ loop.index }}" hx-swap="outerHTML">
+                <input type="hidden" name="org_id" value="{{ org_id }}">
+                <input type="hidden" name="org_name" value="{{ org_name }}">
+                <input type="hidden" name="job_title" value="{{ job_title }}">
+                <input type="hidden" name="job_url" value="{{ job_url }}">
+                <input type="hidden" name="salary_raw" value="{{ salary_raw }}">
+                <button type="submit" style="background:var(--signal-green);color:#fff;border:none;padding:0.3rem 0.7rem;border-radius:4px;font-size:0.8rem;cursor:pointer;">Approve</button>
+            </form>
+            <form hx-post="/jobs/review/reject" hx-target="#review-{{ loop.index }}" hx-swap="outerHTML">
+                <input type="hidden" name="job_url" value="{{ job_url }}">
+                <button type="submit" style="background:var(--signal-red);color:#fff;border:none;padding:0.3rem 0.7rem;border-radius:4px;font-size:0.8rem;cursor:pointer;">Reject</button>
+            </form>
+        </div>
+    </div>
+</article>

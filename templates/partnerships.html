@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Corporate Partnerships — NonprofitSage.ai{% endblock %}
+
+{% block content %}
+
+  <h1>Corporate Partnerships</h1>
+  <p class="page-desc">Track high-value corporate partnerships (&gt;&pound;200k), strategic corporate relationships, and charity-of-the-year programmes across the sector.</p>
+
+  <div class="ds-label">Active Partnerships</div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+      <thead>
+        <tr style="background:var(--bg);">
+          <th style="text-align:left;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);border-bottom:1px solid var(--border);">Charity</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);border-bottom:1px solid var(--border);">Corporate Partner</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);border-bottom:1px solid var(--border);">Value</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);border-bottom:1px solid var(--border);">Start Date</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);border-bottom:1px solid var(--border);">Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="5" style="padding:2.5rem 1rem;text-align:center;color:var(--text-muted);font-size:0.85rem;">
+            No active partnerships tracked yet. This view will populate from news signals and Charity Commission filings once ingestion is wired up.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="ds-label">Recently Announced</div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:2rem 1.5rem;text-align:center;color:var(--text-muted);font-size:0.85rem;">
+    Will be populated from news signals.
+  </div>
+
+{% endblock %}

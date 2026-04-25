@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}{{ (master.get('org_name', org_id) or org_id) | smart_org }} — Report — Intelligence Hub{% endblock %}
+{% block content %}
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="breadcrumb">
+    <a href="/pipeline">Intel</a> &rsaquo;
+    <strong>{{ (master.get('org_name', org_id) or org_id) | smart_org }}</strong>
+</nav>
+
+<!-- Header -->
+{% include "components/dossier_header.html" %}
+
+<!-- Quick-action bar (sticky): Generate Report, Enrich Contacts, View in Loxo -->
+{% include "components/dossier_quick_actions.html" %}
+
+<!-- Why this score? — top scoring triggers pulled from org_triggers.parquet.
+     Gives the headline number an explanation without the reader having to
+     dig into the signals panel. -->
+{% if top_triggers %}
+<section style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:10px;padding:14px 18px;margin:0 0 14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+  <div style="font-size:10px;font-weight:700;letter-spacing:0.7px;color:var(--text-muted,#8c95a6);text-transform:uppercase;margin-bottom:8px;">
+    Why this score?
+  </div>
+  <div style="font-size:13px;color:var(--text-secondary,#5a6578);line-height:1.55;">
+    {% for t in top_triggers %}
+    <div style="padding:8px 0;{% if not loop.last %}border-bottom:1px solid var(--border,#e2e6ec);{% endif %}"{% if t.evidence %} title="{{ t.evidence }}"{% endif %}>
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+        <span style="font-weight:700;color:var(--text-primary,#1a2332);font-size:13.5px;">{{ t.label }}</span>
+        <span style="font-size:11px;color:var(--text-muted,#8c95a6);">{% if t.days_ago is not none %}{% if t.days_ago == 0 %}today{% elif t.days_ago == 1 %}yesterday{% else %}{{ t.days_ago }}d ago{% endif %}{% endif %}</span>
+      </div>
+      {% if t.blurb %}<div style="margin-top:3px;">{{ t.blurb }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<!-- Quick info: last contact, current vacancies, events timeline -->
+{% include "components/dossier_quick_info.html" %}
+
+<!-- Opportunity card (if exists) -->
+{% if opp %}
+<article class="card
+    {% if opp.get('primary_frame') == 'bleeding_neck' %}card-bn{% elif opp.get('primary_frame') == 'fresh_wallet' %}card-fw{% endif %}
+    {% if opp.get('status') == 'pursuing' %}card-pursuing{% endif %}"
+    id="card-{{ org_id }}">
+
+    <header>
+        <div class="card-meta">
+            <span title="Composite score from 34 triggers — higher means more signals of commercial opportunity">Score: {{ "%.0f"|format(opp.get('score', 0) or 0) }}</span>
+            {% if opp.get('score_band') %} &middot; <span title="{% if opp['score_band'] == 'watch' %}Watch band: score 40-59, worth monitoring for developments{% elif opp['score_band'] == 'hot' %}Hot band: score 60+, strong commercial opportunity{% elif opp['score_band'] == 'warm' %}Warm band: score 20-39, some signals present{% else %}{{ opp['score_band'] }}{% endif %}">Band {{ opp['score_band'] }}</span>{% endif %}
+            {% if opp.get('confidence') %} &middot; <span title="How reliable the evidence is — based on source count, recency, and data quality">Confidence {{ "%.0f"|format(opp['confidence']) }}</span>{% endif %}
+            {% if opp.get('freshness') is not none %}
+                &middot; <span title="How recent the evidence is — 100% means all signals are current">Freshness {{ "%.0f%%"|format((opp['freshness'] or 0) * 100) }}</span>
+            {% endif %}
+            &middot; <span class="status-tag status-{{ opp.get('status', 'new') }}">{{ opp.get('status', 'new') }}</span>
+        </div>
+    </header>
+
+    <!-- Top signals -->
+    {% set signals_raw = opp.get('top_signal_ids', '[]') or '[]' %}
+    {% set signals = signals_raw | fromjson if signals_raw is string else signals_raw %}
+    {% if signals %}
+    <ol class="signals">
+        {% for sig in signals %}
+            {% if sig %}<li>{{ trigger_display_names.get(sig, sig | replace('_', ' ') | title) }}</li>{% endif %}
+        {% endfor %}
+    </ol>
+    {% endif %}
+
+    <!-- Warm path -->
+    {% if opp.get('has_warm_path') %}
+    <p class="warm-path">
+        <span class="warm-icon" title="Warm path available">&#9734;</span>
+        Known contact: <strong>{{ opp.get('warm_path_contact', '') }}</strong> — direct connection
+    </p>
+    {% endif %}
+
+    <!-- Claim / Skip actions -->
+    <footer class="card-actions">
+        <details class="dropdown">
+            <summary role="button" class="btn-primary">Claim</summary>
+            <ul>
+                <li><a hx-post="/api/triage/{{ org_id }}/claim"
+                       hx-vals='{"claimed_by": "Tim"}'
+                       hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Claim for Tim</a></li>
+                <li><a hx-post="/api/triage/{{ org_id }}/claim"
+                       hx-vals='{"claimed_by": "Rory"}'
+                       hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Claim for Rory</a></li>
+            </ul>
+        </details>
+
+        <button class="btn-ghost"
+                hx-post="/api/triage/{{ org_id }}/skip"
+                hx-vals='{"reason": "skipped"}'
+                hx-target="#card-{{ org_id }}"
+                hx-swap="outerHTML">
+            Skip
+        </button>
+
+        <button class="btn-secondary"
+                hx-post="/api/triage/{{ org_id }}/push-to-loxo"
+                hx-swap="none"
+                title="Record push to Loxo">
+            &#10140; Loxo
+        </button>
+    </footer>
+</article>
+{% endif %}
+
+<!-- Brief panel -->
+{% include "components/dossier_brief.html" %}
+
+<!-- Signals panel -->
+{% include "components/dossier_signals.html" %}
+
+<!-- Unified Contacts panel (merges Loxo + LinkedIn + Derrick + alumni) -->
+{% include "components/dossier_contacts.html" %}
+
+<!-- Error handler for lazy-loaded panels -->
+<script>
+function panelError(evt) {
+    if (!evt.detail.successful) {
+        var el = evt.target.closest('[hx-get]');
+        if (el) {
+            el.innerHTML = '<article class="dossier-panel"><p class="panel-error">Failed to load. <a href="#" onclick="htmx.trigger(this.closest(\'[hx-get]\'),\'revealed\');return false">Retry</a></p></article>';
+        }
+    }
+}
+</script>
+
+<!-- On-demand panels (lazy-loaded via HTMX) -->
+<div id="annual-report" hx-get="/api/org/{{ org_id }}/panel/annual-report"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Annual Report Intelligence</h3></header>
+        <p aria-busy="true">Loading annual report data...</p>
+    </article>
+</div>
+
+<div hx-get="/api/org/{{ org_id }}/panel/financial"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Financial Overview</h3></header>
+        <p aria-busy="true">Loading financial data...</p>
+    </article>
+</div>
+
+<div hx-get="/api/org/{{ org_id }}/panel/financial-trend"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">5-Year Financial Trend</h3></header>
+        <p aria-busy="true">Loading multi-year financials...</p>
+    </article>
+</div>
+
+<div hx-get="/api/org/{{ org_id }}/panel/pay-bands"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Senior Pay Bands</h3></header>
+        <p aria-busy="true">Loading senior pay data...</p>
+    </article>
+</div>
+
+<div hx-get="/api/org/{{ org_id }}/panel/grants"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Grant Funding</h3></header>
+        <p aria-busy="true">Loading grant funding data...</p>
+    </article>
+</div>
+
+<div hx-get="/api/org/{{ org_id }}/panel/digital"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Digital Presence</h3></header>
+        <p aria-busy="true">Loading digital signals...</p>
+    </article>
+</div>
+
+<div id="news"
+     hx-get="/api/org/{{ org_id }}/panel/news"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Recent News</h3></header>
+        <p aria-busy="true">Loading news...</p>
+    </article>
+</div>
+
+<div hx-get="/api/org/{{ org_id }}/panel/peers"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Peer Organisations</h3></header>
+        <p aria-busy="true">Loading peer data...</p>
+    </article>
+</div>
+
+<div id="peer-analysis-container"
+     hx-get="/api/org/{{ org_id }}/panel/peer-analysis"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)">
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Strategic peer analysis</h3></header>
+        <p aria-busy="true">Generating peer analysis (may take a few seconds on first view)…</p>
+    </article>
+</div>
+
+<div hx-get="/api/org/{{ org_id }}/panel/parliamentary"
+     hx-trigger="revealed" hx-swap="innerHTML"
+     hx-on::after-request="panelError(event)"
+     hx-request='{"timeout": 5000}'>
+    <article class="dossier-panel">
+        <header><h3 class="ds-label" style="margin:0;">Parliamentary Mentions</h3></header>
+        <p aria-busy="true">Loading parliamentary data...</p>
+    </article>
+</div>
+
+{% endblock %}

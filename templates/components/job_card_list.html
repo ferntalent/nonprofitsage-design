@@ -1,0 +1,36 @@
+{# HTMX fragment: results count + list of job cards with optional load-more button #}
+<p class="job-count">
+  {% if total == 0 %}
+    <strong>No results found</strong>
+  {% elif items|length < total %}
+    <strong>{{ total }}</strong> results found — showing first <strong>{{ items|length }}</strong>
+  {% else %}
+    <strong>{{ total }}</strong> result{{ 's' if total != 1 else '' }} found
+  {% endif %}
+</p>
+{% if not items %}
+<div style="text-align:center;padding:2.5rem 1rem;color:var(--text-muted);">
+  <div style="font-size:0.9rem;font-weight:700;color:var(--text-secondary);">No jobs match this filter</div>
+  <div style="font-size:0.78rem;margin-top:0.25rem;">Try broadening your filters or clear your search</div>
+</div>
+{% endif %}
+{% for item in items %}
+    {% set card_rank = loop.index + (offset|default(0)|int) %}
+    {% include "components/job_card.html" %}
+{% endfor %}
+
+{% if items|length < total %}
+{# Every param the /jobs/cards endpoint accepts must be forwarded here
+   so auto-fired Load More (fired by jobs.html::jobTriaged when the
+   visible queue drops below 5) stays inside the user's active filter
+   set. Missing a param causes the next batch to silently widen the
+   result beyond the current filters — Codex flagged this on the #355
+   follow-up review. #}
+<button class="load-more"
+        hx-get="/jobs/cards?offset={{ offset + limit }}&limit={{ limit }}&contract_type={{ contract_type | default('') | urlencode }}&source_type={{ source_type | default('') | urlencode }}&salary_min={{ salary_min | default(-1) }}&salary_max={{ salary_max | default(0) }}&salary_rate={{ salary_rate | default('annual') | urlencode }}&sort={{ sort | default('intel_priority') | urlencode }}&readvertised_only={{ readvertised_only | default('') | urlencode }}&title_match={{ title_match | default('') | urlencode }}&title_search={{ title_search | default('') | urlencode }}&org_search={{ org_search | default('') | urlencode }}&cause_area={{ cause_area | default('') | urlencode }}&income_band={{ income_band | default('') | urlencode }}&income_min={{ income_min | default('') }}&income_max={{ income_max | default('') }}&function={{ function | default('') | urlencode }}&hide_agency={{ hide_agency | default('') | urlencode }}&show_shortlisted={{ show_shortlisted | default('') | urlencode }}&closing_within={{ closing_within | default('') | urlencode }}&show_all={{ show_all | default('') | urlencode }}"
+        hx-target="#job-card-list"
+        hx-swap="beforeend"
+        hx-on::after-request="this.remove()">
+    Load more
+</button>
+{% endif %}

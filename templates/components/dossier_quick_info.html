@@ -1,0 +1,74 @@
+{# Last contacted + open jobs + events timeline — compact summary under the header. #}
+<section class="dossier-quick-info">
+    <style>
+        .dossier-quick-info { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 18px; }
+        .dqi-line { font-size: 12.5px; color: var(--text-muted, #5a6578); }
+        .dqi-line strong { color: var(--text-primary, #1a2332); font-weight: 600; }
+        .dqi-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 900px) { .dqi-panels { grid-template-columns: 1fr; } }
+        .dqi-card { border: 1px solid var(--border, #e2e6ec); border-radius: 8px; padding: 10px 14px; background: var(--surface, #fff); }
+        .dqi-card h4 { margin: 0 0 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-muted, #8c95a6); }
+        .dqi-card ul { list-style: none; margin: 0; padding: 0; }
+        .dqi-card li { font-size: 12.5px; padding: 3px 0; color: var(--text-primary, #1a2332); display: flex; gap: 8px; align-items: baseline; }
+        .dqi-card li a { color: inherit; text-decoration: none; font-weight: 600; }
+        .dqi-card li a:hover { color: var(--pink, #FF4FBE); }
+        .dqi-card .dqi-meta { font-size: 11px; color: var(--text-muted, #8c95a6); margin-left: auto; white-space: nowrap; }
+        .dqi-empty { color: var(--text-muted, #8c95a6); font-size: 12px; }
+        .dqi-section-label { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--pink, #FF4FBE); margin-right: 6px; }
+    </style>
+
+    {# Last contact line — deliberately terse; the full contacts list sits
+       in the Contacts and Key Contacts panels further down the page. #}
+    <p class="dqi-line">
+        {% if last_contact %}
+            <strong>Last outreach:</strong>
+            {{ last_contact.when }}
+            ({{ last_contact.method | replace('_', ' ') }}{% if last_contact.actor %} — {{ last_contact.actor }}{% endif %}){% if last_contact.subject %} — &ldquo;{{ last_contact.subject }}&rdquo;{% endif %}
+        {% else %}
+            <strong>No previous outreach</strong> tracked for this organisation. Contacts on file appear below.
+        {% endif %}
+    </p>
+
+    {% if related_jobs or related_events_upcoming or related_events_past %}
+    <div class="dqi-panels">
+        {% if related_jobs %}
+        <div class="dqi-card">
+            <h4>Current vacancies</h4>
+            <ul>
+                {% for j in related_jobs %}
+                <li>
+                    <a href="/jobs?job_id={{ j.job_id }}">{{ j.job_title or 'Untitled role' }}</a>
+                    <span class="dqi-meta">
+                        {% if j.posted_days_ago is not none %}posted {{ j.posted_days_ago }}d ago{% endif %}
+                        {% if j.closing_in_days is not none %}· closes in {{ j.closing_in_days }}d{% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if related_events_upcoming or related_events_past %}
+        <div class="dqi-card">
+            <h4>Events</h4>
+            <ul>
+                {% for e in related_events_upcoming %}
+                <li>
+                    <span class="dqi-section-label">Upcoming</span>
+                    <a href="/events?event_id={{ e.event_id }}">{{ e.event_name or 'Event' }}</a>
+                    <span class="dqi-meta">{{ e.event_date or e.event_quarter or '' }}</span>
+                </li>
+                {% endfor %}
+                {% for e in related_events_past %}
+                <li>
+                    <span class="dqi-section-label" style="color:var(--text-muted,#8c95a6);">Past</span>
+                    <a href="/events?event_id={{ e.event_id }}">{{ e.event_name or 'Event' }}</a>
+                    <span class="dqi-meta">{{ e.event_date or e.event_quarter or '' }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>

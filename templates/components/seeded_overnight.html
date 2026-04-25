@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Seeded overnight — NonprofitSage.ai{% endblock %}
+{% block content %}
+
+<div style="max-width:900px;margin:0 auto;padding:24px 0;">
+  <h1>Seeded overnight</h1>
+  <p style="color:var(--text-secondary);font-size:13px;margin-bottom:14px;">
+    Organisations where the nightly seeder pulled contacts into Loxo in the last 24 hours.
+    Click a row to open the intel detail for that org.
+  </p>
+
+  <div class="stat-card-grid cols-2">
+    <div class="stat-card">
+      <div class="stat-card-number highlight">{{ total_orgs }}</div>
+      <div class="stat-card-label">Orgs seeded</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-number steel">{{ total_contacts }}</div>
+      <div class="stat-card-label">Contacts pulled</div>
+    </div>
+  </div>
+
+  {# --- Last night's runs (Phase 7c) --- #}
+  {% if cron_runs %}
+  <section style="margin-bottom:22px;
+                  {% if cron_runs_any_failed %}
+                  border:2px solid var(--danger, #c0392b);border-radius:8px;padding:10px 14px;background:#fff6f5;
+                  {% else %}
+                  background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;
+                  {% endif %}">
+    <h2 style="font-size:14px;font-weight:700;color:var(--navy);margin:0 0 4px;">
+      Last night's runs
+      {% if cron_runs_any_failed %}
+        <span style="color:var(--danger, #c0392b);font-weight:700;">— attention needed</span>
+      {% else %}
+        <span style="color:var(--text-muted);font-weight:500;">— all OK</span>
+      {% endif %}
+    </h2>
+    <p style="font-size:11.5px;color:var(--text-muted);margin:0 0 8px;">
+      Scheduled jobs in the last 24h. Red border = at least one failed or is stuck.
+    </p>
+    <ul style="list-style:none;padding:0;margin:0;font-size:12.5px;line-height:1.65;">
+      {% for run in cron_runs %}
+        {% set glyph = '✅' %}
+        {% set colour = 'var(--text-primary)' %}
+        {% if run.status == 'error' or run.status == 'timeout' %}
+          {% set glyph = '❌' %}
+          {% set colour = 'var(--danger, #c0392b)' %}
+        {% elif run.stuck %}
+          {% set glyph = '🔄' %}
+          {% set colour = 'var(--warning, #b7791f)' %}
+        {% elif run.status == 'running' %}
+          {% set glyph = '⏳' %}
+          {% set colour = 'var(--text-muted)' %}
+        {% endif %}
+        <li style="color:{{ colour }};padding:2px 0;">
+          {{ glyph }} <strong>{{ run.job_name }}</strong>
+          <span style="color:var(--text-muted);">—</span>
+          {{ run.status }}
+          {% if run.duration %}<span style="color:var(--text-muted);">({{ run.duration }})</span>{% endif %}
+          {% if run.stats %}
+            {% if run.stats.orgs_processed is defined %}
+              <span style="color:var(--text-muted);font-size:11.5px;">·
+                {{ run.stats.orgs_processed }} orgs, {{ run.stats.credits_used or 0 }} credits
+              </span>
+            {% elif run.stats.years_fetched is defined %}
+              <span style="color:var(--text-muted);font-size:11.5px;">·
+                {{ run.stats.processed or 0 }}/{{ run.stats.total or 0 }} orgs,
+                {{ run.stats.years_fetched or 0 }} years,
+                {{ run.stats.overviews_fetched or 0 }} overviews
+              </span>
+            {% endif %}
+            {% if run.stats.errors and run.stats.errors > 0 %}
+              <span style="color:var(--warning, #b7791f);">· {{ run.stats.errors }} error{{ 's' if run.stats.errors != 1 else '' }}</span>
+            {% endif %}
+          {% endif %}
+          {% if run.error_msg %}
+            <div style="margin-left:22px;color:var(--danger, #c0392b);font-size:11.5px;">
+              {{ run.error_msg[:160] }}{% if run.error_msg|length > 160 %}…{% endif %}
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {# --- Pipeline velocity (last 7 days) --- #}
+  <section style="margin-bottom:22px;">
+    <h2 style="font-size:14px;font-weight:700;color:var(--navy);margin:0 0 8px;">Pipeline this week</h2>
+    <div class="stat-card-grid cols-4">
+      <div class="stat-card compact">
+        <div class="stat-card-number">{{ velocity.leads_seeded }}</div>
+        <div class="stat-card-label">New leads seeded</div>
+      </div>
+      <div class="stat-card compact">
+        <div class="stat-card-number">{{ velocity.claims }}</div>
+        <div class="stat-card-label">Orgs claimed</div>
+      </div>
+      <div class="stat-card compact">
+        <div class="stat-card-number">{{ velocity.outreach }}</div>
+        <div class="stat-card-label">Outreach emails</div>
+      </div>
+      <div class="stat-card compact">
+        <div class="stat-card-number">{{ velocity.enriched }}</div>
+        <div class="stat-card-label">Orgs enriched</div>
+      </div>
+    </div>
+  </section>
+
+  {# --- Derrick enrichment summary (last 24h) --- #}
+  {% if enrichment_summary and enrichment_summary.orgs > 0 %}
+  <section style="margin-bottom:22px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;">
+    <h2 style="font-size:14px;font-weight:700;color:var(--navy);margin:0 0 6px;">Contacts enriched overnight</h2>
+    <p style="font-size:12.5px;color:var(--text-secondary);margin:0 0 8px;">
+      <strong>{{ enrichment_summary.orgs }}</strong> orgs processed,
+      <strong>{{ enrichment_summary.contacts }}</strong> contacts found,
+      <strong>{{ enrichment_summary.credits }}</strong> credits used.
+    </p>
+    {% if enrichment_summary.top %}
+    <ul style="margin:0;padding-left:18px;color:var(--text-primary);font-size:12.5px;line-height:1.65;">
+      {% for t in enrichment_summary.top %}
+      <li>
+        {% if t.org_id %}<a href="/org/{{ t.org_id }}" style="color:var(--text-primary);font-weight:600;">{{ (t.org_name or t.org_id) | smart_org }}</a>{% else %}<span style="font-weight:600;">{{ (t.org_name or '—') | smart_org }}</span>{% endif %}
+        — {{ t.contacts_enriched }} contacts ({{ t.credits_used }} credits)
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if items %}
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+      <thead>
+        <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Organisation</th>
+          <th style="text-align:left;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Cause</th>
+          <th style="text-align:left;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Region</th>
+          <th style="text-align:right;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Score</th>
+          <th style="text-align:right;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Contacts</th>
+          <th style="text-align:right;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Seeded</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in items %}
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:8px 10px;">
+            <a href="/pipeline/detail/{{ i.org_id }}" style="color:var(--text-primary);font-weight:600;text-decoration:none;">
+              {{ (i.org_name or i.org_id) | smart_org }}
+            </a>
+          </td>
+          <td style="padding:8px 10px;color:var(--text-secondary);">{{ i.cause_area or '—' }}</td>
+          <td style="padding:8px 10px;color:var(--text-secondary);">{{ i.location or '—' }}</td>
+          <td style="padding:8px 10px;text-align:right;color:var(--text-primary);font-variant-numeric:tabular-nums;">
+            {% if i.score %}{{ i.score | int }}{% else %}—{% endif %}
+          </td>
+          <td style="padding:8px 10px;text-align:right;color:var(--text-primary);font-variant-numeric:tabular-nums;">
+            {{ i.contacts_seeded_count or 0 }}
+          </td>
+          <td style="padding:8px 10px;text-align:right;color:var(--text-muted);font-size:11px;">
+            {{ i.contacts_seeded_at | format_last_contacted }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:40px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);">
+    <div style="font-size:13px;margin-bottom:4px;">No seeding in the last 24 hours.</div>
+    <div style="font-size:11px;">The nightly cron runs at 02:30. Check logs/lead_seeder.log if this looks wrong.</div>
+  </div>
+  {% endif %}
+
+  {% if recent_moves %}
+  <section style="margin-top:28px;">
+    <h2 style="font-size:16px;font-weight:700;color:var(--navy);margin:0 0 4px 0;">Recent job moves</h2>
+    <p style="color:var(--text-secondary);font-size:12px;margin:0 0 10px 0;">
+      Detected from contact refreshes over the last 30 days. The losing org often needs a replacement; the gaining org just welcomed new leadership.
+    </p>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Person</th>
+            <th style="text-align:left;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Left</th>
+            <th style="text-align:left;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Joined</th>
+            <th style="text-align:right;padding:8px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Moved</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in recent_moves %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 10px;">
+              <div style="font-weight:600;color:var(--text-primary);">{{ m.name }}</div>
+              {% if m.to_title %}<div style="font-size:11px;color:var(--text-muted);">{{ m.to_title }}</div>{% endif %}
+            </td>
+            <td style="padding:8px 10px;color:var(--text-secondary);">
+              {% if m.from_org_id %}
+                <a href="/pipeline/detail/{{ m.from_org_id }}" style="color:var(--text-secondary);">{{ (m.from_org or '—') | smart_org }}</a>
+              {% else %}
+                {{ (m.from_org or '—') | smart_org }}
+              {% endif %}
+              {% if m.from_title %}<div style="font-size:11px;color:var(--text-muted);">{{ m.from_title }}</div>{% endif %}
+            </td>
+            <td style="padding:8px 10px;color:var(--text-primary);">
+              {% if m.to_org_id %}
+                <a href="/pipeline/detail/{{ m.to_org_id }}" style="color:var(--text-primary);font-weight:600;">{{ (m.to_org or '—') | smart_org }}</a>
+              {% else %}
+                {{ (m.to_org or '—') | smart_org }}
+              {% endif %}
+            </td>
+            <td style="padding:8px 10px;text-align:right;color:var(--text-muted);font-size:11px;">
+              {{ m.moved_date or '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if event_reminders %}
+  <section style="margin-top:32px;">
+    <h2 style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:8px;">Event reminders — next 7 days</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Follow-ups you set on events in the Leads tab. Each row is due to be contacted within the next week.</p>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f8fafc;text-align:left;">
+            <th style="padding:8px 10px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Organisation</th>
+            <th style="padding:8px 10px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Event</th>
+            <th style="padding:8px 10px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Type</th>
+            <th style="padding:8px 10px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:right;">Contact by</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in event_reminders %}
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:8px 10px;">
+              {% if r.org_id %}
+                <a href="/org/{{ r.org_id }}" style="color:var(--text-primary);font-weight:600;">{{ (r.org_name or '—') | smart_org }}</a>
+              {% else %}
+                <span style="color:var(--text-primary);font-weight:600;">{{ (r.org_name or '—') | smart_org }}</span>
+              {% endif %}
+            </td>
+            <td style="padding:8px 10px;color:var(--text-primary);">{{ r.event_name or '—' }}</td>
+            <td style="padding:8px 10px;color:var(--text-secondary);">{{ r.event_type | replace('_', ' ') | title }}</td>
+            <td style="padding:8px 10px;text-align:right;color:#5b7fc4;font-weight:600;">{{ r.remind_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+{% endblock %}
