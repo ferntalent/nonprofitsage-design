@@ -1,10 +1,9 @@
 {% extends "base.html" %}
+{% from 'components/_sage_mark.html' import nps_header %}
 {% block title %}Corporate Partnerships — NonprofitSage.ai{% endblock %}
+{% block page_header %}{{ nps_header(title='Corporate partnerships', eyebrow='MORE · PARTNERSHIPS', subtitle='High-value corporate partnerships (>£200k), strategic relationships, and charity-of-the-year programmes across the sector.') }}{% endblock %}
 
 {% block content %}
-
-  <h1>Corporate Partnerships</h1>
-  <p class="page-desc">Track high-value corporate partnerships (&gt;&pound;200k), strategic corporate relationships, and charity-of-the-year programmes across the sector.</p>
 
   <div class="ds-label">Active Partnerships</div>
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;">

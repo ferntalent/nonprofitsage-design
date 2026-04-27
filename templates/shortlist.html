@@ -1,6 +1,8 @@
 {% extends "base.html" %}
+{% from 'components/_sage_mark.html' import nps_header %}
 
 {% block title %}Shortlist — NonprofitSage.ai{% endblock %}
+{% block page_header %}{{ nps_header(title='Shortlist', eyebrow='WORK · SHORTLIST', subtitle='Roles you\'ve flagged as worth pursuing — owners, notes, and contact paths persist across sessions.') }}{% endblock %}
 
 {% block content %}
 
@@ -8,7 +10,7 @@
 /* ── Shortlist-scoped styles ── */
 .sl-card {
   background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--pink);
-  border-radius: 8px; padding: 12px 14px; margin-bottom: 6px;
+  border-radius: 8px; padding: 12px 14px; margin-bottom: var(--row-py, 6px);
   box-shadow: var(--shadow-sm); transition: box-shadow 0.12s;
   display: flex; align-items: center; gap: 12px;
 }
@@ -61,9 +63,6 @@
 .sl-card-archived .sl-org-name { color: var(--text-secondary, #5a6578); }
 .sl-card-archived .sl-title-row { color: var(--text-muted, #8c95a6); }
 </style>
-
-<h2>Shortlist</h2>
-<p class="page-desc">Jobs saved for active pursuit — organised by who's working on them.</p>
 
 <div class="stat-card-grid">
     <div class="stat-card">

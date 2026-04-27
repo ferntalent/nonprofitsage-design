@@ -1,0 +1,56 @@
+{# SageDots, SageMark, page-header band and circles motif. Ported from
+   the Claude Design `UI for NPS` handoff (screens/tokens.jsx and
+   screens/chrome.jsx). The dots use the splash login geometry: top-left
+   pink-500, top-right pink-soft, bottom-left steel, bottom-right pink-soft.
+
+   Usage:
+     {% from 'components/_sage_mark.html' import sage_mark, page_header, sage_dots, circles_motif %}
+     {{ sage_mark(size=20, dark=true) }}
+     {{ page_header(title='Jobs', eyebrow='FIND · JOBS', subtitle='…') }}
+#}
+
+{% macro sage_dots(size=22) -%}
+{%- set r = (size * 0.225) | round(2) -%}
+{%- set rOther = (r * 0.85) | round(2) -%}
+{%- set rTL = (r * 0.95) | round(2) -%}
+<svg class="sage-dots" width="{{ size }}" height="{{ size }}" viewBox="0 0 {{ size }} {{ size }}" aria-hidden="true">
+  <circle cx="{{ r }}" cy="{{ r }}" r="{{ rTL }}" fill="#E63E92"/>
+  <circle cx="{{ size - r }}" cy="{{ r }}" r="{{ rOther }}" fill="#F472B6"/>
+  <circle cx="{{ r }}" cy="{{ size - r }}" r="{{ rOther }}" fill="#6E7CA8"/>
+  <circle cx="{{ size - r }}" cy="{{ size - r }}" r="{{ rOther }}" fill="#F472B6"/>
+</svg>
+{%- endmacro %}
+
+{% macro sage_mark(size=22, dark=true) -%}
+<span class="sage-mark{% if not dark %} sage-mark--light{% endif %}">
+  {{ sage_dots(size) }}
+  <span class="sage-mark__word"><span class="sm-nonprofit">Nonprofit</span><span class="sm-sage">Sage</span><span class="sm-ai">.ai</span></span>
+</span>
+{%- endmacro %}
+
+{# Two oversized blurred pink/steel circles on the right of the dark
+   header band. Pure decoration; pointer-events none. #}
+{% macro circles_motif(density='low') -%}
+<svg class="nps-circles" aria-hidden="true">
+  {% if density == 'med' -%}
+  <circle cx="78%" cy="30%" r="90"  fill="#E63E92" opacity="0.16"/>
+  <circle cx="97%" cy="78%" r="130" fill="#F472B6" opacity="0.14"/>
+  <circle cx="66%" cy="92%" r="70"  fill="#6E7CA8" opacity="0.16"/>
+  <circle cx="88%" cy="8%"  r="50"  fill="#F472B6" opacity="0.12"/>
+  {%- else -%}
+  <circle cx="88%" cy="58%" r="120" fill="#E63E92" opacity="0.16"/>
+  <circle cx="72%" cy="92%" r="75"  fill="#F472B6" opacity="0.14"/>
+  {%- endif %}
+</svg>
+{%- endmacro %}
+
+{% macro nps_header(title, eyebrow=none, subtitle=none, density='low') -%}
+<section class="page-header" role="region" aria-label="Page header">
+  {{ circles_motif(density) }}
+  <div class="page-header__inner">
+    {% if eyebrow %}<div class="page-header__eyebrow">{{ eyebrow }}</div>{% endif %}
+    <h1 class="page-header__title">{{ title }}</h1>
+    {% if subtitle %}<p class="page-header__subtitle">{{ subtitle }}</p>{% endif %}
+  </div>
+</section>
+{%- endmacro %}

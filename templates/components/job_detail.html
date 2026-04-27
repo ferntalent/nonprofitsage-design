@@ -75,23 +75,14 @@
     {% endif %}
   </div>
 
-  {# ── WHY THIS SCORE? — top scoring triggers for this org ── #}
-  {% if top_triggers %}
-  <div class="jd-trigger-panel">
-    <div class="jd-trigger-label">Why this score?</div>
-    <div class="jd-trigger-list">
-      {% for t in top_triggers %}
-      <div class="jd-trigger-row"{% if t.evidence %} title="{{ t.evidence }}"{% endif %}>
-        <div class="jd-trigger-head">
-          <span class="jd-trigger-name">{{ t.label }}</span>
-          <span class="jd-trigger-pts">{% if t.days_ago is not none %}{% if t.days_ago == 0 %}today{% elif t.days_ago == 1 %}yesterday{% else %}{{ t.days_ago }}d ago{% endif %}{% endif %}</span>
-        </div>
-        {% if t.blurb %}<div class="jd-trigger-blurb">{{ t.blurb }}</div>{% endif %}
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
+  {# ── WHY THIS SCORE? — Split panel from the UI for NPS handoff.
+       Renders top-5 scoring triggers with plain-English "why",
+       contribution pts, and a total. Partial is no-op when triggers
+       are empty. ── #}
+  {% set triggers = top_triggers %}
+  {% set score_total = score %}
+  {% set score_band_label = score_band %}
+  {% include 'components/_why_score.html' %}
 
   {# ── SCORE BREAKDOWN (Financial / Workforce / Digital / Governance / Delivery) ── #}
   {% include "components/score_breakdown.html" ignore missing %}

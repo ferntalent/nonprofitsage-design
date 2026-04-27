@@ -14,15 +14,22 @@
 
 {# Score band logic #}
 {% set _score_val = score|float if score else 0 %}
+{# Org-scale band thresholds — kept in lockstep with components/card.html
+   so the same org doesn't show as Hot in the list and Warm/Cool in the
+   detail. Per the UI for NPS handoff: 60+ Hot, 40-59 Warm, 25-39
+   Monitoring, <25 Cool. #}
 {% if _score_val >= 60 %}
   {% set score_pill_cls = "score-pill-hot" %}
   {% set band_label = "Hot" %}
-{% elif _score_val >= 20 %}
+{% elif _score_val >= 40 %}
   {% set score_pill_cls = "score-pill-warm" %}
   {% set band_label = "Warm" %}
-{% elif _score_val > 0 %}
+{% elif _score_val >= 25 %}
   {% set score_pill_cls = "score-pill-monitoring" %}
-  {% set band_label = "Watch" %}
+  {% set band_label = "Monitoring" %}
+{% elif _score_val > 0 %}
+  {% set score_pill_cls = "score-pill-cool" %}
+  {% set band_label = "Cool" %}
 {% else %}
   {% set score_pill_cls = "" %}
   {% set band_label = "" %}

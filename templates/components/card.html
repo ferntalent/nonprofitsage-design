@@ -43,7 +43,7 @@
                 {% endif %}
             </span>
             {% if score %}
-            <span class="score-pill score-pill-push-right {% if score >= 60 %}score-pill-hot{% elif score >= 20 %}score-pill-warm{% else %}score-pill-monitoring{% endif %}"
+            <span class="score-pill score-pill-push-right {% if score >= 60 %}score-pill-hot{% elif score >= 40 %}score-pill-warm{% elif score >= 25 %}score-pill-monitoring{% else %}score-pill-cool{% endif %}"
                   title="{{ item | score_tooltip }}">{{ "%.0f"|format(score) }}</span>
             {% endif %}
             {% set _news_count = news_count_for(org_id) if news_count_for is defined else 0 %}

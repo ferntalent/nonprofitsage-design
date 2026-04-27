@@ -1,0 +1,156 @@
+{# Sticky left summary rail for the dossier — identity, score, at-a-glance
+   numbers, last contact, quick links. Ported from the UI for NPS handoff
+   (screens/dossier.jsx::SummaryRail). The rail stays visible at all times
+   so the user has a constant anchor on who/what/score while they tab
+   through Why · Money · People · Activity on the right.
+
+   Expected in scope:
+     org_id, master, opp, last_contact, related_jobs
+#}
+{% set _name        = (master.get('org_name', org_id) or org_id) | smart_org %}
+{% set _initial     = (_name[:1] | upper) if _name else '?' %}
+{% set _cause       = master.get('cause_area', '') or '' %}
+{% set _region      = master.get('address_region', '') or '' %}
+{% set _charity_num = master.get('charity_number', '') or master.get('charity_number_ew', '') or '' %}
+{% set _website     = master.get('website', '') or '' %}
+{% set _income_raw  = master.get('latest_total_gross_income', 0) or 0 %}
+{% set _income      = _income_raw | float %}
+{# Score lives on the master record under one of three columns
+   (intel_score / total_score / priority_score) depending on which
+   pipeline ran last; opp also carries a score for the opportunity
+   rollup. Fall through with `is none` checks so a legitimately-zero
+   score (low-priority org) doesn't get masked by a stale fallback. #}
+{% set _score_raw = master.get('intel_score') %}
+{% if _score_raw is none %}{% set _score_raw = master.get('total_score') %}{% endif %}
+{% if _score_raw is none %}{% set _score_raw = master.get('priority_score') %}{% endif %}
+{% if _score_raw is none and opp %}{% set _score_raw = opp.get('score') %}{% endif %}
+{% set _score       = (_score_raw | float) if _score_raw is not none else none %}
+{% set _band_raw    = ((master.get('score_band') or (opp.get('score_band') if opp else '')) or '') | string | lower %}
+{% set _open_jobs   = (related_jobs or []) | length %}
+
+{# Visual band — match the unified org-scale (60/40/25/<25). A score of
+   exactly 0 still renders Cool; only `none` (no score yet) suppresses
+   the block. #}
+{% set _band_cls = '' %}{% set _band_label = '' %}
+{% if _score is not none %}
+  {% if _score >= 60 %}{% set _band_cls = 'score-pill-hot' %}{% set _band_label = 'Hot' %}
+  {% elif _score >= 40 %}{% set _band_cls = 'score-pill-warm' %}{% set _band_label = 'Warm' %}
+  {% elif _score >= 25 %}{% set _band_cls = 'score-pill-monitoring' %}{% set _band_label = 'Monitoring' %}
+  {% else %}{% set _band_cls = 'score-pill-cool' %}{% set _band_label = 'Cool' %}
+  {% endif %}
+{% endif %}
+
+<aside class="dossier-rail" aria-label="Org summary">
+
+  {# Identity — favicon + name + cause. The two-line cause/region split
+     keeps the long names from wrapping over the score block. #}
+  <div class="dr-identity">
+    {% if _website %}
+      <img class="dr-favicon"
+           src="https://www.google.com/s2/favicons?domain={{ _website | domain_only }}&sz=128"
+           onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='inline-flex';"
+           alt="" width="40" height="40">
+      <span class="dr-favicon-fb" style="display:none;" aria-hidden="true">{{ _initial }}</span>
+    {% else %}
+      <span class="dr-favicon-fb" aria-hidden="true">{{ _initial }}</span>
+    {% endif %}
+    <div class="dr-identity-text">
+      <h2 class="dr-name">{{ _name }}</h2>
+      {% if _cause %}<div class="dr-cause">{{ _cause }}</div>{% endif %}
+    </div>
+  </div>
+
+  {# Identity chips — distress signal flag, region, charity number. #}
+  <div class="dr-chips">
+    {% if opp and opp.get('primary_frame') == 'bleeding_neck' %}
+      <span class="badge badge-bn">Distress signal</span>
+    {% elif opp and opp.get('primary_frame') == 'fresh_wallet' %}
+      <span class="badge badge-fw">Growth signal</span>
+    {% endif %}
+    {% if _region %}<span class="dr-chip">{{ _region }}</span>{% endif %}
+    {% if _charity_num %}<span class="dr-chip">#{{ _charity_num }}</span>{% endif %}
+  </div>
+
+  {# Score block — large number + band pill + bar. The bar is a hint of
+     position on the 0-100 scale, gradient steel→pink. Ranking is omitted
+     because dossier context doesn't yet carry org rank within cause. #}
+  {% if _score is not none %}
+  <div class="dr-score-block">
+    <div class="dr-score-row">
+      <span class="dr-score-number">{{ _score | round(0) | int }}</span>
+      {% if _band_label %}<span class="score-pill {{ _band_cls }}">{{ _band_label }}</span>{% endif %}
+    </div>
+    <div class="dr-score-bar" role="presentation">
+      <div class="dr-score-bar-fill" style="width: {{ ([_score, 100] | min) | round(1) }}%;"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# At-a-glance numbers — income, open jobs (we have these reliably),
+     plus reserves/staff if the master record carries them. We don't
+     fabricate fields the data layer doesn't ship. #}
+  <div class="dr-stats">
+    <div class="dr-stats-label">At a glance</div>
+    <div class="dr-stats-grid">
+      {% if _income > 0 %}
+      <div class="dr-stat">
+        <div class="dr-stat-label">Income</div>
+        <div class="dr-stat-value">
+          {%- if _income >= 1e6 %}£{{ "%.2f"|format(_income / 1e6) }}m
+          {%- elif _income >= 1000 %}£{{ "%.0f"|format(_income / 1000) }}k
+          {%- else %}£{{ "%.0f"|format(_income) }}{% endif -%}
+        </div>
+      </div>
+      {% endif %}
+      <div class="dr-stat">
+        <div class="dr-stat-label">Open roles</div>
+        <div class="dr-stat-value{% if _open_jobs > 0 %} dr-stat-accent{% endif %}">{{ _open_jobs }}</div>
+      </div>
+    </div>
+  </div>
+
+  {# Last outreach — terse one-liner. The full activity log lives under
+     the Activity tab. #}
+  <div class="dr-section">
+    <div class="dr-stats-label">Last outreach</div>
+    {% if last_contact %}
+    <div class="dr-last-contact">
+      <b>{{ last_contact.when }}</b> — {{ last_contact.method | replace('_', ' ') }}{% if last_contact.actor %} from {{ last_contact.actor }}{% endif %}
+    </div>
+    {% if last_contact.subject %}
+    <div class="dr-last-subject">&ldquo;{{ last_contact.subject }}&rdquo;</div>
+    {% endif %}
+    {% else %}
+    <div class="dr-last-contact dr-empty">No previous outreach tracked.</div>
+    {% endif %}
+  </div>
+
+  {# Quick links — register / website / Loxo. The Back to Intel link
+     covers the breadcrumb function the old header carried. #}
+  <div class="dr-section">
+    <div class="dr-stats-label">Resources</div>
+    <div class="dr-links">
+      {% if _website %}
+      <a class="dr-link" href="{{ _website }}" target="_blank" rel="noopener">
+        <span class="dr-link-arrow" aria-hidden="true">↗</span>
+        <span class="dr-link-text">Website</span>
+      </a>
+      {% endif %}
+      {% if _charity_num %}
+      <a class="dr-link" href="https://register-of-charities.charitycommission.gov.uk/charity-search/-/charity-details/{{ _charity_num }}" target="_blank" rel="noopener">
+        <span class="dr-link-arrow" aria-hidden="true">↗</span>
+        <span class="dr-link-text">Charity Commission register</span>
+      </a>
+      {% endif %}
+      <a class="dr-link" href="https://fern-talent.app.loxo.co/agencies/40830/companies?query={{ _name | urlencode }}" target="_blank" rel="noopener">
+        <span class="dr-link-arrow" aria-hidden="true">↗</span>
+        <span class="dr-link-text">Open in Loxo</span>
+      </a>
+      <a class="dr-link" href="/pipeline">
+        <span class="dr-link-arrow" aria-hidden="true">←</span>
+        <span class="dr-link-text">Back to Intel</span>
+      </a>
+    </div>
+  </div>
+
+</aside>

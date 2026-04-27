@@ -1,0 +1,81 @@
+{# Why-this-score panel — Split rebuild from the UI for NPS handoff
+   (screens/why-score.jsx::SplitPanel). Component list with plain-English
+   "why" on the left and contribution points on the right, capped by a
+   total. Drives off the trigger_explainer payload (label / blurb /
+   evidence / weighted_signal / days_ago).
+
+   Usage:
+     {% include 'components/_why_score.html' %}
+   Expected in scope:
+     triggers          — list[dict] from fetch_top_triggers (cap at 5)
+     score_total       — float|none (optional headline score)
+     score_band_label  — string|none (e.g. "Hot" / "Warm" / "Monitoring")
+     score_rank        — string|none (e.g. "#3 of 297")
+
+   The partial renders nothing if `triggers` is empty. #}
+{% set _trigs = (triggers or [])[:5] %}
+{% if _trigs %}
+{# Coerce weighted_signal — fetch_top_triggers can yield None on a row
+   with a NULL weighted_signal column. Without coercion `| max` raises
+   TypeError and the partial 500s. The `or 1` guards divide-by-zero in
+   the bar-fill width below when every contribution is zero. #}
+{% set _pts = _trigs | map(attribute='weighted_signal') | map('default', 0, true) | list %}
+{% set _max_pts = (_pts | max) or 1 %}
+{% set _sum_pts = _pts | sum %}
+<section class="why-score">
+  <header class="why-score__head">
+    <div>
+      <div class="why-score__eyebrow">Why this score?</div>
+      {% if score_total is defined and score_total %}
+      <div class="why-score__headline">
+        <span class="why-score__total">{{ "%.0f"|format(score_total|float) }}</span>
+        {% if score_band_label %}
+          {% set _band_cls = 'score-pill-monitoring' %}
+          {% if score_band_label|lower == 'hot' %}{% set _band_cls = 'score-pill-hot' %}
+          {% elif score_band_label|lower == 'warm' %}{% set _band_cls = 'score-pill-warm' %}
+          {% elif score_band_label|lower == 'cool' %}{% set _band_cls = 'score-pill-cool' %}
+          {% endif %}
+          <span class="score-pill {{ _band_cls }}">{{ score_band_label }}</span>
+        {% endif %}
+        {% if score_rank %}<span class="why-score__rank">Ranked <b>{{ score_rank }}</b></span>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="why-score__col-head">
+    <div>Component · contribution</div>
+    <div class="why-score__col-pts">+pts</div>
+  </div>
+
+  <div class="why-score__list">
+    {% for t in _trigs %}
+    <div class="why-score__row">
+      <div class="why-score__row-main">
+        <div class="why-score__row-head">
+          <span class="why-score__name">{{ t.label }}</span>
+          {% if t.days_ago is not none %}
+          <span class="why-score__age">{% if t.days_ago == 0 %}today{% elif t.days_ago == 1 %}yesterday{% else %}{{ t.days_ago }}d ago{% endif %}</span>
+          {% endif %}
+        </div>
+        {% if t.blurb %}<div class="why-score__why">{{ t.blurb }}</div>{% endif %}
+        {% if t.evidence or t.weighted_signal %}
+        <div class="why-score__bar-row">
+          <div class="why-score__bar" role="presentation">
+            <div class="why-score__bar-fill" style="width: {{ (((t.weighted_signal or 0) / _max_pts) * 100) | round(1) }}%;"></div>
+          </div>
+          {% if t.evidence %}<span class="why-score__evidence">{{ t.evidence }}</span>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="why-score__pts">+{{ "%.1f"|format(t.weighted_signal or 0) }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <footer class="why-score__foot">
+    <span class="why-score__foot-label">Total · top {{ _trigs|length }} component{{ 's' if _trigs|length != 1 else '' }}</span>
+    <span class="why-score__foot-pts">+{{ "%.1f"|format(_sum_pts) }}</span>
+  </footer>
+</section>
+{% endif %}

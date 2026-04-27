@@ -10,70 +10,92 @@
     <link rel="preload" href="/static/fonts/open-sans-400.woff2" as="font" type="font/woff2" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <link rel="stylesheet" href="/static/brand.css?v=91">
+    <link rel="stylesheet" href="/static/brand.css?v=97">
+    <script>
+    /* Tweaks — apply persisted density / accent / numerics CSS vars
+       before first paint to avoid a flash of default styling. The
+       tweaks panel in the user dropdown re-applies on change without
+       reload. Values are validated against the same allow-list the
+       panel exposes; anything else is dropped silently. This is
+       browser-local only — an attacker who tampered with localStorage
+       could only affect their own session — but the allow-list also
+       guards against ever wiring a free-text source into here later. */
+    (function () {
+      var ALLOW = {
+        rowPy:   ['12px', '8px', '4px'],
+        accent:  ['#E63E92', '#FF3EA5', '#6E7CA8', '#3F9472'],
+        numFont: ["'Open Sans', sans-serif", "'JetBrains Mono', ui-monospace, monospace"],
+      };
+      var VAR = { rowPy: '--row-py', accent: '--np-accent', numFont: '--num-font' };
+      try {
+        var t = JSON.parse(localStorage.getItem('nps:tweaks') || '{}');
+        var r = document.documentElement;
+        Object.keys(VAR).forEach(function (k) {
+          if (ALLOW[k].indexOf(t[k]) !== -1) r.style.setProperty(VAR[k], t[k]);
+        });
+      } catch (e) { /* localStorage unavailable or malformed; ignore */ }
+    })();
+    </script>
     <meta property="og:title" content="NonprofitSage.ai">
     <meta property="og:description" content="Predictive intelligence for the UK nonprofit sector">
     <meta property="og:url" content="https://nonprofitsage.ai">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
+    {% from 'components/_sage_mark.html' import sage_mark %}
     {% set _user = request.session.get('user', none) if request.session else none %}
     {# Header + nav only for signed-in users. Public pages (home/login)
        render full-bleed without the product chrome. #}
     {% if _user %}
     <header>
-        <a href="/" class="logo-link" aria-label="NonprofitSage.ai — home">
-            {# Wordmark only — the four-dot SVG was dropped in #373's
-               nav refresh because it competed with the typographic
-               wordmark in a 120px strip. "Sage" stays pink as the
-               single brand accent. #}
-            <span class="logo-text"><span class="logo-nonprofit">Nonprofit</span><span class="logo-sage">Sage</span><span class="logo-ai">.ai</span></span>
+        <a href="/" aria-label="NonprofitSage.ai — home" style="text-decoration:none;">
+            {{ sage_mark(size=22, dark=true) }}
         </a>
+        <span class="chrome-sep" aria-hidden="true"></span>
         <input type="checkbox" id="nav-toggle" class="nav-toggle-input" hidden>
         <label for="nav-toggle" class="nav-toggle-btn" aria-label="Toggle navigation">
             <span></span><span></span><span></span>
         </label>
-        {# Count hoists — compute each once so both the per-link badges and
-           the Admin rollup summary can reference them without re-calling
-           the Jinja-global functions. #}
+        {# Count hoists — compute each once so per-link badges and the
+           "More" rollup can reference them without re-calling the Jinja
+           globals. Agencies is now a Find-bucket primary item; its badge
+           no longer rolls up under More. #}
         {% set _agc = agencies_unguessed_count() %}
         {% set _epc = pending_events_count() %}
         {% set _arc = admin_review_count() %}
         {% set _opc = outreach_pending_count() %}
-        {% set _admin_badge = _agc + _arc + _opc %}
         {% set _path = request.url.path %}
-        {% set _ref_active = _path.startswith('/events') or _path.startswith('/news') or _path.startswith('/partnerships') or _path.startswith('/agencies') or _path.startswith('/outreach') or _path.startswith('/reports') %}
-        {% set _ref_badge = _agc + _opc + _epc %}
-        {# Nav grouped Find / Work / Reference per the UX review.
-           Find + Work stay flat (frequent daily items, one click); the
-           less-frequent Reference items roll up under "More". Review is
-           promoted out of the old Admin disclosure since it's curation
-           work, not settings. #}
+        {% set _agencies_active = _path.startswith('/agencies') or _path.startswith('/contracts') %}
+        {% set _ref_active = _path.startswith('/events') or _path.startswith('/news') or _path.startswith('/partnerships') or _path.startswith('/outreach') or _path.startswith('/reports') %}
+        {% set _ref_badge = _opc + _epc %}
+        {# Three buckets per the UI for NPS handoff: Find · Work · More.
+           Contracts is folded into Agencies (League / Live jobs tabs)
+           and the new Agencies link sits in Find. #}
         <nav class="site-nav">
             {# Find — opportunity surfaces #}
             <a href="/pipeline" class="nav-link {% if _path == '/pipeline' %}nav-active{% endif %}">Intel</a>
             <a href="/jobs" class="nav-link {% if _path == '/jobs' %}nav-active{% endif %}">Jobs</a>
             <a href="/schools" class="nav-link {% if _path.startswith('/schools') %}nav-active{% endif %}">Schools</a>
-            <a href="/contracts" class="nav-link {% if _path == '/contracts' %}nav-active{% endif %}">Contracts</a>
-            <span class="nav-group-sep" aria-hidden="true"></span>
+            <a href="/agencies" class="nav-link {% if _agencies_active %}nav-active{% endif %}">Agencies{% if _agc > 0 %} <span class="nav-badge">{{ _agc }}</span>{% endif %}</a>
+            <span class="chrome-sep" aria-hidden="true"></span>
             {# Work — active workflow #}
             <a href="/shortlist" class="nav-link {% if _path == '/shortlist' %}nav-active{% endif %}">Shortlist</a>
             <a href="/candidates" class="nav-link {% if _path == '/candidates' %}nav-active{% endif %}">Candidates</a>
             <a href="/admin/review" class="nav-link {% if _path.startswith('/admin/review') %}nav-active{% endif %}">Review{% if _arc > 0 %} <span class="nav-badge">{{ _arc }}</span>{% endif %}</a>
-            <span class="nav-group-sep" aria-hidden="true"></span>
-            {# Reference — rolled up disclosure #}
+            <span class="chrome-sep" aria-hidden="true"></span>
+            {# More — less-frequent reference items rolled up #}
             <details class="nav-admin{% if _ref_active %} nav-active{% endif %}"{% if _ref_active %} open{% endif %}>
                 <summary class="nav-link nav-admin-summary">More{% if _ref_badge > 0 %} <span class="nav-badge">{{ _ref_badge }}</span>{% endif %}</summary>
                 <div class="nav-admin-menu">
                     <a href="/events" class="nav-admin-item {% if _path == '/events' %}nav-active{% endif %}">Events{% if _epc > 0 %} <span class="nav-badge">{{ _epc }}</span>{% endif %}</a>
                     <a href="/news" class="nav-admin-item {% if _path.startswith('/news') %}nav-active{% endif %}">News</a>
                     <a href="/partnerships" class="nav-admin-item {% if _path == '/partnerships' %}nav-active{% endif %}">Partnerships</a>
-                    <a href="/agencies" class="nav-admin-item {% if _path.startswith('/agencies') %}nav-active{% endif %}">Agencies{% if _agc > 0 %} <span class="nav-badge">{{ _agc }}</span>{% endif %}</a>
                     <a href="/outreach" class="nav-admin-item {% if _path.startswith('/outreach') %}nav-active{% endif %}">Outreach{% if _opc > 0 %} <span class="nav-badge">{{ _opc }}</span>{% endif %}</a>
                     <a href="/reports" class="nav-admin-item {% if _path.startswith('/reports') %}nav-active{% endif %}">Reports</a>
                 </div>
             </details>
         </nav>
+        <div class="command-hint" title="Command palette coming soon"><kbd>⌘K</kbd> Jump to anything</div>
         <div class="nav-user">
             <button class="nav-user-btn" onclick="this.parentElement.classList.toggle('open')">
                 {% if _user.picture %}
@@ -85,11 +107,39 @@
             </button>
             <div class="nav-user-dropdown">
                 <div class="nav-user-email">{{ _user.email }}</div>
+                {# Tweaks panel — density / accent / numerics. Persists to
+                   localStorage and applies via :root CSS vars without
+                   reload. Pre-paint hydration sits in the <head>. #}
+                <div class="tweaks-section">
+                    <div class="tweaks-label">Density</div>
+                    <div class="tweaks-row" data-tweak="rowPy">
+                        <button type="button" class="tweaks-btn" data-value="12px">Comfortable</button>
+                        <button type="button" class="tweaks-btn" data-value="8px">Compact</button>
+                        <button type="button" class="tweaks-btn" data-value="4px">Terminal</button>
+                    </div>
+                </div>
+                <div class="tweaks-section">
+                    <div class="tweaks-label">Accent</div>
+                    <div class="tweaks-row" data-tweak="accent">
+                        <button type="button" class="tweaks-swatch" data-value="#E63E92" style="background:#E63E92" aria-label="Magenta"></button>
+                        <button type="button" class="tweaks-swatch" data-value="#FF3EA5" style="background:#FF3EA5" aria-label="Hot pink"></button>
+                        <button type="button" class="tweaks-swatch" data-value="#6E7CA8" style="background:#6E7CA8" aria-label="Steel"></button>
+                        <button type="button" class="tweaks-swatch" data-value="#3F9472" style="background:#3F9472" aria-label="Green"></button>
+                    </div>
+                </div>
+                <div class="tweaks-section">
+                    <div class="tweaks-label">Numerics</div>
+                    <div class="tweaks-row" data-tweak="numFont">
+                        <button type="button" class="tweaks-btn" data-value="'Open Sans', sans-serif">Sans</button>
+                        <button type="button" class="tweaks-btn" data-value="'JetBrains Mono', ui-monospace, monospace">Mono</button>
+                    </div>
+                </div>
                 <a href="/logout" class="nav-user-signout">Sign out</a>
             </div>
         </div>
     </header>
     {% endif %}
+    {% block page_header %}{% endblock %}
     <main id="main-content" class="{% block main_class %}container{% endblock %}">
         {% block content %}{% endblock %}
     </main>
@@ -117,6 +167,58 @@
         var dd = document.querySelector('.nav-user.open');
         if (dd && !dd.contains(e.target)) { dd.classList.remove('open'); }
     });
+
+    /* Tweaks panel — density / accent / numerics. Pre-paint hydration in
+       <head> applies persisted values; this block wires the buttons,
+       paints the active state, persists to localStorage, and updates
+       --row-py / --np-accent / --num-font on :root so any component
+       reading those vars updates without reload. */
+    (function () {
+      var STORAGE_KEY = 'nps:tweaks';
+      var DEFAULTS = { rowPy: '12px', accent: '#E63E92', numFont: "'Open Sans', sans-serif" };
+      /* Allow-list mirrors the head-pre-paint validator so a value can
+         only ever flow into setProperty if it matches one of the
+         buttons rendered below. Acts as a defence-in-depth check in
+         case someone later wires a non-template source to apply(). */
+      var ALLOW = {
+        rowPy:   ['12px', '8px', '4px'],
+        accent:  ['#E63E92', '#FF3EA5', '#6E7CA8', '#3F9472'],
+        numFont: ["'Open Sans', sans-serif", "'JetBrains Mono', ui-monospace, monospace"],
+      };
+      var state;
+      try { state = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')); }
+      catch (e) { state = Object.assign({}, DEFAULTS); }
+      var cssVarFor = { rowPy: '--row-py', accent: '--np-accent', numFont: '--num-font' };
+      function paintActive() {
+        document.querySelectorAll('[data-tweak]').forEach(function (group) {
+          var key = group.dataset.tweak;
+          group.querySelectorAll('[data-value]').forEach(function (btn) {
+            btn.classList.toggle('is-active', btn.dataset.value === state[key]);
+          });
+        });
+      }
+      function apply(key, value) {
+        /* Reject anything not on the per-tweak allow-list. Belt and
+           braces — current callers all pass template-controlled
+           data-value attributes, but this stops a future free-text
+           wiring from quietly enabling style injection via the
+           --np-accent / --num-font setProperty calls. */
+        if (!ALLOW[key] || ALLOW[key].indexOf(value) === -1) return;
+        state[key] = value;
+        document.documentElement.style.setProperty(cssVarFor[key], value);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+        paintActive();
+      }
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-tweak] [data-value]');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var key = btn.parentElement.dataset.tweak;
+        apply(key, btn.dataset.value);
+      });
+      paintActive();
+    })();
 
     /* Double-handle linear range slider. Any .ds-range on the page
        auto-initialises on DOMContentLoaded. Handles sit on a shared

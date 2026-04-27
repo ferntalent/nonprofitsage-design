@@ -1,6 +1,8 @@
 {% extends "base.html" %}
+{% from 'components/_sage_mark.html' import nps_header %}
 {% block title %}Review — NonprofitSage.ai{% endblock %}
 {% block main_class %}container-full{% endblock %}
+{% block page_header %}{{ nps_header(title='Review queue', eyebrow='WORK · REVIEW', subtitle='Jobs and signals flagged for human verification before they enter the main feed — your corrections train the ranking model.') }}{% endblock %}
 {% block content %}
 
 {# Per the UX review's "Celebrate progress": every 10 reviewed items
@@ -33,8 +35,6 @@
            hx-swap="innerHTML">
         {% include "components/review_stats_cards.html" %}
       </div>
-
-      <p class="page-desc">Jobs and data flagged for manual checking before they appear in the main list.</p>
 
       {# Filter pills — auto-refresh, preserves current category + sort. #}
       <div class="filter-row" id="review-filters"

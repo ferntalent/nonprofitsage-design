@@ -1,5 +1,7 @@
 {% extends "base.html" %}
+{% from 'components/_sage_mark.html' import nps_header %}
 {% block title %}Outreach — NonprofitSage{% endblock %}
+{% block page_header %}{{ nps_header(title='Outreach', eyebrow='MORE · OUTREACH', subtitle='Drafted outbound emails awaiting your review before they go out.') }}{% endblock %}
 {% block content %}
 
 <div class="stats-bar" role="group">

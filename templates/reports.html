@@ -1,5 +1,7 @@
 {% extends "base.html" %}
+{% from 'components/_sage_mark.html' import nps_header %}
 {% block title %}Reports — NonprofitSage.ai{% endblock %}
+{% block page_header %}{{ nps_header(title='Reports', eyebrow='MORE · REPORTS', subtitle='Saved and scheduled briefing reports — pull a fresh dossier on a target list, or download the latest run.') }}{% endblock %}
 {% block content %}
 
 <style>

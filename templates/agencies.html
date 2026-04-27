@@ -1,10 +1,15 @@
 {% extends "base.html" %}
+{% from 'components/_sage_mark.html' import nps_header %}
 {% block title %}Agencies — NonprofitSage.ai{% endblock %}
+{% block page_header %}
+{{ nps_header(title='Agencies', eyebrow='FIND · AGENCIES', subtitle='Where recruitment agencies are competing in the charity sector — and the live temp/fixed-term roles they\'re running right now.') }}
+<nav class="subtabs" aria-label="Agencies sub-tabs">
+  <a href="/agencies" class="active">League</a>
+  <a href="/contracts">Live jobs</a>
+</nav>
+{% endblock %}
 
 {% block content %}
-
-  <h1>Agency market intelligence</h1>
-  <p class="page-desc">How recruitment agencies compete in the charity sector — volume, specialisms, and salary data.</p>
 
   <!-- Summary stats -->
   {% set total_placements = agencies | sum(attribute='total_placements') %}
@@ -169,7 +174,10 @@ const raw = {{ trend | tojson }};
 const salaryRaw = {{ salary_by_agency | tojson }};
 const roleRaw = {{ role_seasonality | tojson }};
 
-const COLOURS = ['#FF4FBE','#5b7fc4','#0d1f2d','#00c48c','#f7a600','#e05c5c','#9b59b6','#1abc9c'];
+// Brand chart palette — steel/navy first per the brief's "do not color
+// charts pink by default" rule. Pink kept available for the one series
+// that genuinely represents a predictive moment (e.g. "Hot leads").
+const COLOURS = ['#5b7fc4','#0d1f2d','#3F9472','#C79A2A','#9b59b6','#1abc9c','#E63E92','#e05c5c'];
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function showTab(name) {

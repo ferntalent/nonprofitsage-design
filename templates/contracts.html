@@ -1,6 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Contracts — NonprofitSage.ai{% endblock %}
+{% from 'components/_sage_mark.html' import nps_header %}
+{% block title %}Agencies — Live jobs ({{ total }}) — NonprofitSage.ai{% endblock %}
 {% block main_class %}container-full{% endblock %}
+{% block page_header %}
+{{ nps_header(title='Agencies', eyebrow='FIND · AGENCIES', subtitle='Live temporary and fixed-term roles posted by recruitment agencies — these often convert into permanent hires once the contract ends.') }}
+<nav class="subtabs" aria-label="Agencies sub-tabs">
+  <a href="/agencies">League</a>
+  <a href="/contracts" class="active">Live jobs</a>
+</nav>
+{% endblock %}
 {% block content %}
 
 <div class="master-detail">
@@ -28,8 +36,6 @@
           <div class="stat-card-label" title="Roles matching Fern Talent's recruitment specialisms">Relevant to Fern</div>
         </div>
       </div>
-
-      <p class="page-desc">Temporary and fixed-term roles nearing their end date — these often convert into permanent hires.</p>
 
       {# Filter pills #}
       <div class="filter-row" id="contract-filters">

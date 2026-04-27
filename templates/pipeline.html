@@ -1,6 +1,8 @@
 {% extends "base.html" %}
+{% from 'components/_sage_mark.html' import nps_header %}
 {% block title %}Intel — NonprofitSage.ai{% endblock %}
 {% block main_class %}container-full{% endblock %}
+{% block page_header %}{{ nps_header(title='Signals worth your morning', eyebrow='INTEL · TODAY', subtitle='Organisations showing early indicators they may need recruitment or consultancy support — ranked by how loud the signal is right now.') }}{% endblock %}
 {% block content %}
 
 <div class="master-detail">
@@ -20,8 +22,6 @@
           <div class="stat-card-label">New in last 24h</div>
         </div>
       </div>
-
-      <p class="page-desc">Organisations showing early signs they may need recruitment or consultancy support soon, based on financial, governance, and hiring signals.</p>
 
       {# Quick org-name search. The Haiku-powered NL parser was removed
          in #372 — it kept hallucinating filters the backend couldn't

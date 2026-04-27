@@ -1,227 +1,294 @@
 {% extends "base.html" %}
-{% block title %}{{ (master.get('org_name', org_id) or org_id) | smart_org }} — Report — Intelligence Hub{% endblock %}
+{% block title %}{{ (master.get('org_name', org_id) or org_id) | smart_org }} — Report — NonprofitSage.ai{% endblock %}
+{% block main_class %}container-full{% endblock %}
 {% block content %}
 
-<!-- Breadcrumb -->
-<nav aria-label="breadcrumb" class="breadcrumb">
-    <a href="/pipeline">Intel</a> &rsaquo;
-    <strong>{{ (master.get('org_name', org_id) or org_id) | smart_org }}</strong>
-</nav>
+{# Dossier — sticky-rail rebuild from the UI for NPS handoff
+   (screens/dossier.jsx). Left rail anchors who/what/score; the right
+   body switches between Why · Money · People · Activity tabs keyed to
+   triage-call needs. The previous long single-column scroll left users
+   hunting for "what changed" mid-call.
 
-<!-- Header -->
-{% include "components/dossier_header.html" %}
+   Tab state uses radio inputs so the visible-tab CSS toggle works
+   without JavaScript. The HTMX panels use `revealed` triggers which
+   re-fire when an element transitions from display:none to visible
+   (IntersectionObserver re-evaluates on layout); the small JS block
+   at the bottom belt-and-braces this for older htmx versions. #}
 
-<!-- Quick-action bar (sticky): Generate Report, Enrich Contacts, View in Loxo -->
-{% include "components/dossier_quick_actions.html" %}
+{# Tab radio inputs — must sit before the .dossier-shell so the sibling
+   selector in CSS can drive the panel display state. Default to Why.
+   tabindex=-1 + aria-hidden keep them out of the keyboard tab order
+   so sighted keyboard users land on the visible <label role=tab>
+   elements (which carry their own roving tabindex), not on these
+   visually-hidden inputs. #}
+<input type="radio" name="dossier-tab" id="dossier-tab-why" class="dossier-tab-radio" checked tabindex="-1" aria-hidden="true">
+<input type="radio" name="dossier-tab" id="dossier-tab-money" class="dossier-tab-radio" tabindex="-1" aria-hidden="true">
+<input type="radio" name="dossier-tab" id="dossier-tab-people" class="dossier-tab-radio" tabindex="-1" aria-hidden="true">
+<input type="radio" name="dossier-tab" id="dossier-tab-activity" class="dossier-tab-radio" tabindex="-1" aria-hidden="true">
 
-<!-- Why this score? — top scoring triggers pulled from org_triggers.parquet.
-     Gives the headline number an explanation without the reader having to
-     dig into the signals panel. -->
-{% if top_triggers %}
-<section style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:10px;padding:14px 18px;margin:0 0 14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-  <div style="font-size:10px;font-weight:700;letter-spacing:0.7px;color:var(--text-muted,#8c95a6);text-transform:uppercase;margin-bottom:8px;">
-    Why this score?
-  </div>
-  <div style="font-size:13px;color:var(--text-secondary,#5a6578);line-height:1.55;">
-    {% for t in top_triggers %}
-    <div style="padding:8px 0;{% if not loop.last %}border-bottom:1px solid var(--border,#e2e6ec);{% endif %}"{% if t.evidence %} title="{{ t.evidence }}"{% endif %}>
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-        <span style="font-weight:700;color:var(--text-primary,#1a2332);font-size:13.5px;">{{ t.label }}</span>
-        <span style="font-size:11px;color:var(--text-muted,#8c95a6);">{% if t.days_ago is not none %}{% if t.days_ago == 0 %}today{% elif t.days_ago == 1 %}yesterday{% else %}{{ t.days_ago }}d ago{% endif %}{% endif %}</span>
-      </div>
-      {% if t.blurb %}<div style="margin-top:3px;">{{ t.blurb }}</div>{% endif %}
-    </div>
-    {% endfor %}
-  </div>
-</section>
-{% endif %}
+<div class="dossier-shell">
 
-<!-- Quick info: last contact, current vacancies, events timeline -->
-{% include "components/dossier_quick_info.html" %}
+  {% include 'components/_dossier_rail.html' %}
 
-<!-- Opportunity card (if exists) -->
-{% if opp %}
-<article class="card
-    {% if opp.get('primary_frame') == 'bleeding_neck' %}card-bn{% elif opp.get('primary_frame') == 'fresh_wallet' %}card-fw{% endif %}
-    {% if opp.get('status') == 'pursuing' %}card-pursuing{% endif %}"
-    id="card-{{ org_id }}">
+  <main class="dossier-body" aria-label="Dossier body">
 
-    <header>
-        <div class="card-meta">
-            <span title="Composite score from 34 triggers — higher means more signals of commercial opportunity">Score: {{ "%.0f"|format(opp.get('score', 0) or 0) }}</span>
-            {% if opp.get('score_band') %} &middot; <span title="{% if opp['score_band'] == 'watch' %}Watch band: score 40-59, worth monitoring for developments{% elif opp['score_band'] == 'hot' %}Hot band: score 60+, strong commercial opportunity{% elif opp['score_band'] == 'warm' %}Warm band: score 20-39, some signals present{% else %}{{ opp['score_band'] }}{% endif %}">Band {{ opp['score_band'] }}</span>{% endif %}
-            {% if opp.get('confidence') %} &middot; <span title="How reliable the evidence is — based on source count, recency, and data quality">Confidence {{ "%.0f"|format(opp['confidence']) }}</span>{% endif %}
-            {% if opp.get('freshness') is not none %}
-                &middot; <span title="How recent the evidence is — 100% means all signals are current">Freshness {{ "%.0f%%"|format((opp['freshness'] or 0) * 100) }}</span>
-            {% endif %}
+    {# Tab strip — labels drive the radio inputs above. role=tab +
+       aria-controls + aria-selected are stamped here; aria-selected is
+       toggled via JS as the user changes tabs (CSS sibling selectors
+       handle the visual side, but ARIA needs an actual attribute
+       update). Tabindex starts at 0 for the default tab and -1 for
+       the others so a single Tab keypress reaches the tablist;
+       Left/Right arrows then move between siblings (handled in the
+       script block below). #}
+    <nav class="dossier-tabs" role="tablist" aria-label="Dossier sections">
+      <label for="dossier-tab-why"      class="dossier-tab" role="tab" id="dt-label-why"      aria-controls="dtab-why"      aria-selected="true"  tabindex="0">
+        <span class="dossier-tab-title">Why this org?</span>
+        <span class="dossier-tab-sub">{{ (top_triggers or []) | length }} signals · score breakdown</span>
+      </label>
+      <label for="dossier-tab-money"    class="dossier-tab" role="tab" id="dt-label-money"    aria-controls="dtab-money"    aria-selected="false" tabindex="-1">
+        <span class="dossier-tab-title">Money</span>
+        <span class="dossier-tab-sub">5y financials · grants · pay bands</span>
+      </label>
+      <label for="dossier-tab-people"   class="dossier-tab" role="tab" id="dt-label-people"   aria-controls="dtab-people"   aria-selected="false" tabindex="-1">
+        <span class="dossier-tab-title">People</span>
+        <span class="dossier-tab-sub">Contacts · peer orgs</span>
+      </label>
+      <label for="dossier-tab-activity" class="dossier-tab" role="tab" id="dt-label-activity" aria-controls="dtab-activity" aria-selected="false" tabindex="-1">
+        <span class="dossier-tab-title">Activity</span>
+        <span class="dossier-tab-sub">Outreach · news · events</span>
+      </label>
+    </nav>
+
+    {# Quick-action bar — sits above the tab content so Generate Report,
+       Enrich Contacts, and View in Loxo are reachable from any tab. #}
+    {% include "components/dossier_quick_actions.html" %}
+
+    {# === WHY THIS ORG? === #}
+    <section class="dossier-tab-panel" id="dtab-why" role="tabpanel" aria-labelledby="dt-label-why">
+
+      {# Why-this-score Split panel from the prior PR — top scoring
+         triggers + plain-English why + +pts + total. Score lives on
+         master under intel_score / total_score / priority_score
+         (whichever pipeline ran last); fall through with `is none`
+         checks so a legitimately-zero score isn't masked. #}
+      {% set triggers = top_triggers %}
+      {% set score_total = master.get('intel_score') %}
+      {% if score_total is none %}{% set score_total = master.get('total_score') %}{% endif %}
+      {% if score_total is none %}{% set score_total = master.get('priority_score') %}{% endif %}
+      {% if score_total is none and opp %}{% set score_total = opp.get('score') %}{% endif %}
+      {% set score_band_label = ((master.get('score_band') or (opp.get('score_band') if opp else '')) or '') | string | title %}
+      {% include 'components/_why_score.html' %}
+
+      {# Brief panel — AI-generated pitch angles. #}
+      {% include "components/dossier_brief.html" %}
+
+      {# Signals panel — confirmed/flagged signal review. #}
+      {% include "components/dossier_signals.html" %}
+
+      {# Opportunity card (legacy) — kept for the claim/skip workflow
+         until that moves to a global action bar. #}
+      {% if opp %}
+      <article class="card
+          {% if opp.get('primary_frame') == 'bleeding_neck' %}card-bn{% elif opp.get('primary_frame') == 'fresh_wallet' %}card-fw{% endif %}
+          {% if opp.get('status') == 'pursuing' %}card-pursuing{% endif %}"
+          id="card-{{ org_id }}">
+        <header>
+          <div class="card-meta">
+            <span title="Composite score from 34 triggers">Score: {{ "%.0f"|format(opp.get('score', 0) or 0) }}</span>
+            {% if opp.get('score_band') %} &middot; <span>Band {{ opp['score_band'] }}</span>{% endif %}
+            {% if opp.get('confidence') %} &middot; <span>Confidence {{ "%.0f"|format(opp['confidence']) }}</span>{% endif %}
+            {% if opp.get('freshness') is not none %} &middot; <span>Freshness {{ "%.0f%%"|format((opp['freshness'] or 0) * 100) }}</span>{% endif %}
             &middot; <span class="status-tag status-{{ opp.get('status', 'new') }}">{{ opp.get('status', 'new') }}</span>
-        </div>
-    </header>
-
-    <!-- Top signals -->
-    {% set signals_raw = opp.get('top_signal_ids', '[]') or '[]' %}
-    {% set signals = signals_raw | fromjson if signals_raw is string else signals_raw %}
-    {% if signals %}
-    <ol class="signals">
-        {% for sig in signals %}
+          </div>
+        </header>
+        {% set signals_raw = opp.get('top_signal_ids', '[]') or '[]' %}
+        {% set signals = signals_raw | fromjson if signals_raw is string else signals_raw %}
+        {% if signals %}
+        <ol class="signals">
+          {% for sig in signals %}
             {% if sig %}<li>{{ trigger_display_names.get(sig, sig | replace('_', ' ') | title) }}</li>{% endif %}
-        {% endfor %}
-    </ol>
-    {% endif %}
-
-    <!-- Warm path -->
-    {% if opp.get('has_warm_path') %}
-    <p class="warm-path">
-        <span class="warm-icon" title="Warm path available">&#9734;</span>
-        Known contact: <strong>{{ opp.get('warm_path_contact', '') }}</strong> — direct connection
-    </p>
-    {% endif %}
-
-    <!-- Claim / Skip actions -->
-    <footer class="card-actions">
-        <details class="dropdown">
+          {% endfor %}
+        </ol>
+        {% endif %}
+        {% if opp.get('has_warm_path') %}
+        <p class="warm-path">
+          <span class="warm-icon">&#9734;</span>
+          Known contact: <strong>{{ opp.get('warm_path_contact', '') }}</strong>
+        </p>
+        {% endif %}
+        <footer class="card-actions">
+          <details class="dropdown">
             <summary role="button" class="btn-primary">Claim</summary>
             <ul>
-                <li><a hx-post="/api/triage/{{ org_id }}/claim"
-                       hx-vals='{"claimed_by": "Tim"}'
-                       hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Claim for Tim</a></li>
-                <li><a hx-post="/api/triage/{{ org_id }}/claim"
-                       hx-vals='{"claimed_by": "Rory"}'
-                       hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Claim for Rory</a></li>
+              <li><a hx-post="/api/triage/{{ org_id }}/claim" hx-vals='{"claimed_by": "Tim"}' hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Claim for Tim</a></li>
+              <li><a hx-post="/api/triage/{{ org_id }}/claim" hx-vals='{"claimed_by": "Rory"}' hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Claim for Rory</a></li>
             </ul>
-        </details>
+          </details>
+          <button class="btn-ghost" hx-post="/api/triage/{{ org_id }}/skip" hx-vals='{"reason": "skipped"}' hx-target="#card-{{ org_id }}" hx-swap="outerHTML">Skip</button>
+          <button class="btn-secondary" hx-post="/api/triage/{{ org_id }}/push-to-loxo" hx-swap="none">&#10140; Loxo</button>
+        </footer>
+      </article>
+      {% endif %}
 
-        <button class="btn-ghost"
-                hx-post="/api/triage/{{ org_id }}/skip"
-                hx-vals='{"reason": "skipped"}'
-                hx-target="#card-{{ org_id }}"
-                hx-swap="outerHTML">
-            Skip
-        </button>
+    </section>
 
-        <button class="btn-secondary"
-                hx-post="/api/triage/{{ org_id }}/push-to-loxo"
-                hx-swap="none"
-                title="Record push to Loxo">
-            &#10140; Loxo
-        </button>
-    </footer>
-</article>
-{% endif %}
+    {# === MONEY === #}
+    <section class="dossier-tab-panel" id="dtab-money" role="tabpanel" aria-labelledby="dt-label-money">
+      <div hx-get="/api/org/{{ org_id }}/panel/financial-trend" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">5-Year Financial Trend</h3></header><p aria-busy="true">Loading multi-year financials…</p></article>
+      </div>
+      <div hx-get="/api/org/{{ org_id }}/panel/financial" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Financial Overview</h3></header><p aria-busy="true">Loading financial data…</p></article>
+      </div>
+      <div hx-get="/api/org/{{ org_id }}/panel/grants" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Grant Funding</h3></header><p aria-busy="true">Loading grant funding…</p></article>
+      </div>
+      <div hx-get="/api/org/{{ org_id }}/panel/pay-bands" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Senior Pay Bands</h3></header><p aria-busy="true">Loading senior pay data…</p></article>
+      </div>
+      <div id="annual-report" hx-get="/api/org/{{ org_id }}/panel/annual-report" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Annual Report Intelligence</h3></header><p aria-busy="true">Loading annual report data…</p></article>
+      </div>
+    </section>
 
-<!-- Brief panel -->
-{% include "components/dossier_brief.html" %}
+    {# === PEOPLE === #}
+    <section class="dossier-tab-panel" id="dtab-people" role="tabpanel" aria-labelledby="dt-label-people">
+      {% include "components/dossier_contacts.html" %}
+      <div hx-get="/api/org/{{ org_id }}/panel/peers" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Peer Organisations</h3></header><p aria-busy="true">Loading peer data…</p></article>
+      </div>
+      <div id="peer-analysis-container" hx-get="/api/org/{{ org_id }}/panel/peer-analysis" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Strategic peer analysis</h3></header><p aria-busy="true">Generating peer analysis…</p></article>
+      </div>
+    </section>
 
-<!-- Signals panel -->
-{% include "components/dossier_signals.html" %}
+    {# === ACTIVITY === #}
+    <section class="dossier-tab-panel" id="dtab-activity" role="tabpanel" aria-labelledby="dt-label-activity">
+      {% include "components/dossier_quick_info.html" %}
+      <div id="news" hx-get="/api/org/{{ org_id }}/panel/news" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Recent News</h3></header><p aria-busy="true">Loading news…</p></article>
+      </div>
+      <div hx-get="/api/org/{{ org_id }}/panel/digital" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)">
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Digital Presence</h3></header><p aria-busy="true">Loading digital signals…</p></article>
+      </div>
+      <div hx-get="/api/org/{{ org_id }}/panel/parliamentary" hx-trigger="revealed" hx-swap="innerHTML" hx-on::after-request="panelError(event)" hx-request='{"timeout": 5000}'>
+        <article class="dossier-panel"><header><h3 class="ds-label" style="margin:0;">Parliamentary Mentions</h3></header><p aria-busy="true">Loading parliamentary data…</p></article>
+      </div>
+    </section>
 
-<!-- Unified Contacts panel (merges Loxo + LinkedIn + Derrick + alumni) -->
-{% include "components/dossier_contacts.html" %}
+  </main>
+</div>
 
-<!-- Error handler for lazy-loaded panels -->
 <script>
+/* Lazy-loaded panel error handler — kept from the previous dossier.
+   When an HTMX request fails (network, 5xx, timeout), swap the panel
+   for an inline error with a Retry trigger. */
 function panelError(evt) {
-    if (!evt.detail.successful) {
-        var el = evt.target.closest('[hx-get]');
-        if (el) {
-            el.innerHTML = '<article class="dossier-panel"><p class="panel-error">Failed to load. <a href="#" onclick="htmx.trigger(this.closest(\'[hx-get]\'),\'revealed\');return false">Retry</a></p></article>';
-        }
-    }
+  if (evt.detail.successful) return;
+  var el = evt.target.closest('[hx-get]');
+  if (!el) return;
+  el.innerHTML = '<article class="dossier-panel"><p class="panel-error">Failed to load. <a href="#" onclick="htmx.trigger(this.closest(\'[hx-get]\'),\'revealed\');return false">Retry</a></p></article>';
 }
+
+/* Tab activation does three things:
+   1. Fire HTMX `revealed` on previously-hidden lazy panels in the
+      newly-active tab — IntersectionObserver does not re-evaluate
+      reliably across htmx versions when an element transitions
+      from display:none to display:block.
+   2. Update `aria-selected` and `tabindex` on the matching <label
+      role=tab> so screen readers see the change (CSS sibling rules
+      cover the visuals only).
+   3. Wire Left/Right/Home/End arrow keys on the tablist for the
+      WAI-ARIA tab pattern. */
+(function () {
+  var TAB_ORDER = ['why', 'money', 'people', 'activity'];
+  function loadPanelsIn(panelId) {
+    var panel = document.getElementById(panelId);
+    if (!panel) return;
+    panel.querySelectorAll('[hx-get]:not([data-loaded])').forEach(function (el) {
+      el.dataset.loaded = '1';
+      if (window.htmx) htmx.trigger(el, 'revealed');
+    });
+  }
+  function syncAria(activeKey) {
+    TAB_ORDER.forEach(function (k) {
+      var label = document.getElementById('dt-label-' + k);
+      if (!label) return;
+      var on = k === activeKey;
+      label.setAttribute('aria-selected', on ? 'true' : 'false');
+      label.setAttribute('tabindex', on ? '0' : '-1');
+    });
+  }
+  function activate(key, focus) {
+    var radio = document.getElementById('dossier-tab-' + key);
+    if (!radio) return;
+    radio.checked = true;
+    syncAria(key);
+    loadPanelsIn('dtab-' + key);
+    if (focus) {
+      var label = document.getElementById('dt-label-' + key);
+      if (label) label.focus();
+    }
+  }
+  document.addEventListener('change', function (e) {
+    if (!e.target.matches('input[name="dossier-tab"]')) return;
+    var key = e.target.id.replace('dossier-tab-', '');
+    syncAria(key);
+    loadPanelsIn('dtab-' + key);
+  });
+  document.addEventListener('keydown', function (e) {
+    var label = e.target.closest('[role="tab"]');
+    if (!label || !label.id.startsWith('dt-label-')) return;
+    var current = label.id.replace('dt-label-', '');
+    var idx = TAB_ORDER.indexOf(current);
+    var next = null;
+    if (e.key === 'ArrowRight') next = TAB_ORDER[(idx + 1) % TAB_ORDER.length];
+    else if (e.key === 'ArrowLeft') next = TAB_ORDER[(idx - 1 + TAB_ORDER.length) % TAB_ORDER.length];
+    else if (e.key === 'Home') next = TAB_ORDER[0];
+    else if (e.key === 'End') next = TAB_ORDER[TAB_ORDER.length - 1];
+    if (next) { e.preventDefault(); activate(next, true); }
+  });
+  /* URL hash → tab map. Existing deep links from elsewhere in the app
+     point at section anchors that used to live in the long single-
+     column dossier (e.g. card.html:51 links #news, job_detail.html:230
+     links #contacts). The map routes those anchors to whichever tab
+     the corresponding panel now sits in so the user lands on the right
+     section instead of staring at the default Why panel. Unknown
+     hashes fall through to the checked radio (Why). */
+  var HASH_TO_TAB = {
+    'news': 'activity',
+    'parliamentary': 'activity',
+    'digital': 'activity',
+    'contacts': 'people',
+    'peers': 'people',
+    'peer-analysis': 'people',
+    'financial': 'money',
+    'financial-trend': 'money',
+    'grants': 'money',
+    'pay-bands': 'money',
+    'annual-report': 'money',
+    'why': 'why',
+    'signals': 'why',
+    'brief': 'why',
+    'money': 'money',
+    'people': 'people',
+    'activity': 'activity',
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    var hashKey = (location.hash || '').replace(/^#/, '');
+    var fromHash = HASH_TO_TAB[hashKey];
+    if (fromHash) {
+      activate(fromHash, false);
+      return;
+    }
+    var checked = document.querySelector('input[name="dossier-tab"]:checked');
+    if (checked) {
+      var key = checked.id.replace('dossier-tab-', '');
+      syncAria(key);
+      loadPanelsIn('dtab-' + key);
+    }
+  });
+})();
 </script>
-
-<!-- On-demand panels (lazy-loaded via HTMX) -->
-<div id="annual-report" hx-get="/api/org/{{ org_id }}/panel/annual-report"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Annual Report Intelligence</h3></header>
-        <p aria-busy="true">Loading annual report data...</p>
-    </article>
-</div>
-
-<div hx-get="/api/org/{{ org_id }}/panel/financial"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Financial Overview</h3></header>
-        <p aria-busy="true">Loading financial data...</p>
-    </article>
-</div>
-
-<div hx-get="/api/org/{{ org_id }}/panel/financial-trend"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">5-Year Financial Trend</h3></header>
-        <p aria-busy="true">Loading multi-year financials...</p>
-    </article>
-</div>
-
-<div hx-get="/api/org/{{ org_id }}/panel/pay-bands"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Senior Pay Bands</h3></header>
-        <p aria-busy="true">Loading senior pay data...</p>
-    </article>
-</div>
-
-<div hx-get="/api/org/{{ org_id }}/panel/grants"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Grant Funding</h3></header>
-        <p aria-busy="true">Loading grant funding data...</p>
-    </article>
-</div>
-
-<div hx-get="/api/org/{{ org_id }}/panel/digital"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Digital Presence</h3></header>
-        <p aria-busy="true">Loading digital signals...</p>
-    </article>
-</div>
-
-<div id="news"
-     hx-get="/api/org/{{ org_id }}/panel/news"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Recent News</h3></header>
-        <p aria-busy="true">Loading news...</p>
-    </article>
-</div>
-
-<div hx-get="/api/org/{{ org_id }}/panel/peers"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Peer Organisations</h3></header>
-        <p aria-busy="true">Loading peer data...</p>
-    </article>
-</div>
-
-<div id="peer-analysis-container"
-     hx-get="/api/org/{{ org_id }}/panel/peer-analysis"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)">
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Strategic peer analysis</h3></header>
-        <p aria-busy="true">Generating peer analysis (may take a few seconds on first view)…</p>
-    </article>
-</div>
-
-<div hx-get="/api/org/{{ org_id }}/panel/parliamentary"
-     hx-trigger="revealed" hx-swap="innerHTML"
-     hx-on::after-request="panelError(event)"
-     hx-request='{"timeout": 5000}'>
-    <article class="dossier-panel">
-        <header><h3 class="ds-label" style="margin:0;">Parliamentary Mentions</h3></header>
-        <p aria-busy="true">Loading parliamentary data...</p>
-    </article>
-</div>
 
 {% endblock %}

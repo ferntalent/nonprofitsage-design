@@ -1,5 +1,7 @@
 {% extends "base.html" %}
+{% from 'components/_sage_mark.html' import nps_header %}
 {% block title %}Candidates — NonprofitSage.ai{% endblock %}
+{% block page_header %}{{ nps_header(title='Candidates', eyebrow='WORK · CANDIDATES', subtitle='Match candidates from your Loxo bench against live opportunities — ranked by sector experience and seniority fit.') }}{% endblock %}
 {% block content %}
 
 <style>
@@ -12,7 +14,7 @@
 
 .mm-card {
   background: var(--surface); border: 1px solid var(--border); border-left: 3px solid #cbd5e1;
-  border-radius: 8px; padding: 12px 14px; margin-bottom: 6px;
+  border-radius: 8px; padding: 12px 14px; margin-bottom: var(--row-py, 6px);
   box-shadow: var(--shadow-sm); transition: box-shadow 0.12s;
 }
 .mm-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
@@ -22,7 +24,7 @@
 .mm-head   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mm-rank   { font-size: 0.65rem; font-weight: 700; color: var(--text-muted); min-width: 1.4rem; }
 .mm-orgname { font-size: 14px; font-weight: 700; color: var(--navy); text-decoration: none; }
-.mm-orgname:hover { color: var(--pink); text-decoration: underline; }
+.mm-orgname:hover { color: var(--navy); text-decoration: underline; }
 .mm-badge  { padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; vertical-align: middle; }
 .mm-badge-hot  { background: var(--red-soft); color: var(--red); }
 .mm-badge-warm { background: var(--amber-soft); color: var(--amber); }
@@ -63,7 +65,7 @@
 .browse-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .browse-card-inner { display: flex; justify-content: space-between; align-items: start; }
 .browse-org-name { font-weight: 700; font-size: 14px; color: var(--navy); text-decoration: none; }
-.browse-org-name:hover { color: var(--pink); }
+.browse-org-name:hover { color: var(--navy); }
 .browse-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
 .browse-links { display: flex; gap: 4px; }
 .browse-link {
